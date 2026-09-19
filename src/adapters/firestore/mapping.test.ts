@@ -6,6 +6,7 @@ import {
   toAttendanceStatus,
   dedupeGroups,
   groupDisplayName,
+  schoolsFromGroups,
   toBranches,
   toGroup,
   toPlayer,
@@ -136,5 +137,18 @@ describe('groupDisplayName', () => {
 
   it('adı olan grubun adı korunur', () => {
     expect(groupDisplayName('Yıldız Kız A', '17:00')).toBe('Yıldız Kız A')
+  })
+})
+
+describe('schoolsFromGroups', () => {
+  it('okul listesi gruplardan türetilir, schools koleksiyonu okunmaz', () => {
+    const groups = [
+      toGroup('g1', { name: 'A', schoolId: 'okul-1' }),
+      toGroup('g2', { name: 'B', schoolId: 'okul-1' }),
+      toGroup('g3', { name: 'C' }),
+    ]
+    const schools = schoolsFromGroups(groups)
+    expect(schools).toHaveLength(2)
+    expect(schools.find((school) => school.id === UNASSIGNED_SCHOOL)?.name).toBe('Okul atanmamış')
   })
 })
