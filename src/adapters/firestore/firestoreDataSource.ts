@@ -13,13 +13,17 @@ import type { Attendance, Group, School } from '../../domain/types'
 import type { AttendanceMark, DataSource, GroupFilter } from '../../ports/repositories'
 import {
   UNASSIGNED_SCHOOL,
+  buildAttendanceDoc,
   fromAttendanceStatus,
   sessionDocId,
   toAttendanceStatus,
+  toBranches,
+  toClubIdentity,
   toGroup,
   toPlayer,
   type FirestoreAthlete,
   type FirestoreGroup,
+  type FirestoreSettings,
 } from './mapping'
 
 const readOnly = () =>
@@ -28,6 +32,8 @@ const readOnly = () =>
 export interface FirestoreOptions {
   /** true olduğunda yoklama canlı Firestore'a yazılır (attendance/{groupId}_{date}). */
   allowWrites?: boolean
+  /** Yazarken kurallara gereken coachId — giriş yapmış kullanıcının uid'i. */
+  currentUserId?: () => string | null
 }
 
 /**
@@ -37,6 +43,11 @@ export interface FirestoreOptions {
  */
 export function createFirestoreDataSource(db: Firestore, options: FirestoreOptions = {}): DataSource {
   const canWrite = options.allowWrites === true
+
+  const loadSettings = async (): Promise<FirestoreSettings | undefined> => {
+    const snapshot = await getDoc(doc(db, 'settings', 'features'))
+    return snapshot.exists() ? (snapshot.data() as FirestoreSettings) : undefined
+  }
 
   const loadGroups = async (): Promise<Group[]> => {
     const snapshot = await getDocs(collection(db, 'groups'))
@@ -67,13 +78,9 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
     },
 
     branches: {
+      // Branşlar ayrı koleksiyon değil: settings/features belgesinin içinde.
       async list() {
-        const snapshot = await getDocs(collection(db, 'branches'))
-        return snapshot.docs.map((row) => ({
-          id: row.id,
-          name: (row.data().name as string) ?? '(isimsiz branş)',
-          slug: (row.data().slug as string) ?? row.id,
-        }))
+        return toBranches(await loadSettings())
       },
       async create() {
         throw readOnly()
@@ -135,6 +142,13 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
       },
     },
 
+    settings: {
+      // settings/features kuralı: allow read: if true — giriş öncesi de okunur.
+      async clubIdentity() {
+        return toClubIdentity(await loadSettings())
+      },
+    },
+
     attendance: {
       async listBySession(sessionId) {
         const snapshot = await getDoc(doc(db, 'attendance', sessionId))
@@ -160,6 +174,11 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
         const [groupId, date] = [sessionId.split('_')[0], sessionId.split('_').pop() ?? '']
         if (!groupId || !date) throw notFound('Oturum', sessionId)
 
+        const coachId = options.currentUserId?.() ?? null
+        if (!coachId) {
+          throw new DomainError('unauthenticated', 'Yoklama yazmak için giriş gerekiyor.')
+        }
+
         const records = Object.fromEntries(
           marks.map((mark) => [
             mark.playerId,
@@ -168,7 +187,7 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
         )
         await setDoc(
           doc(db, 'attendance', sessionId),
-          { groupId, date, type: 'practice', records, updatedAt: new Date().toISOString() },
+          buildAttendanceDoc({ groupId, date, coachId, records }),
           { merge: true },
         )
         return this.listBySession(sessionId)

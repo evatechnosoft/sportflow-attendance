@@ -96,6 +96,13 @@ export function runDataSourceContract(name: string, makeDataSource: () => DataSo
       })
     })
 
+    describe('kulüp kimliği', () => {
+      it('boş olmayan bir kulüp adı döner', async () => {
+        const identity = await db.settings.clubIdentity()
+        expect(identity.primaryName.trim().length).toBeGreaterThan(0)
+      })
+    })
+
     describe('US-1 yoklama', () => {
       it('aynı grup + tarih için ikinci oturum açılmaz', async () => {
         const group = await seedGroup()

@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { AttendanceScreen } from './features/attendance/AttendanceScreen'
 import { ManageScreen } from './features/manage/ManageScreen'
 import { LoginScreen } from './features/auth/LoginScreen'
 import { useFirebaseAuth } from './app/auth'
 import type { DataSourceHandle } from './app/createDataSource'
 import { initFirebase, readFirebaseEnv } from './adapters/firestore/firebase'
+import { useDataSource } from './app/dataSource'
 
 const TABS = [
   { id: 'attendance', label: 'Yoklama' },
@@ -18,6 +20,8 @@ const auth = firebaseConfig ? initFirebase(firebaseConfig).auth : null
 
 export default function App({ handle }: { handle: DataSourceHandle }) {
   const [tab, setTab] = useState<TabId>('attendance')
+  const db = useDataSource()
+  const club = useQuery({ queryKey: ['club-identity'], queryFn: () => db.settings.clubIdentity() })
   const { user, loading, error, signIn, signOutUser } = useFirebaseAuth(
     handle.requiresAuth ? auth : null,
   )
@@ -29,7 +33,12 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
       <header className="sticky top-0 z-10 border-b border-black/5 bg-white/85 px-4 py-3 backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-baseline gap-2">
-            <h1 className="font-display text-lg font-semibold tracking-tight">SportFlow</h1>
+            <h1 className="font-display text-lg font-semibold tracking-tight">
+              {club.data?.primaryName ?? 'SportFlow'}
+              {club.data?.secondaryName && (
+                <span className="ml-1 font-normal text-ink/50">{club.data.secondaryName}</span>
+              )}
+            </h1>
             <SourceBadge handle={handle} />
           </div>
 
@@ -69,6 +78,7 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
           <LoginScreen
             onSignIn={signIn}
             error={error}
+            club={club.data}
             projectId={import.meta.env.VITE_FIREBASE_PROJECT_ID}
           />
         ) : tab === 'attendance' ? (

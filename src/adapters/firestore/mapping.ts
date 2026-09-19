@@ -84,3 +84,51 @@ export function toGroup(id: string, raw: FirestoreGroup): Group {
 export function sessionDocId(groupId: string, date: string): string {
   return `${groupId}_${date}`
 }
+
+export interface FirestoreSettings {
+  branches?: { id?: string; name?: string; slug?: string }[]
+  loginTitlePrimary?: string
+  loginTitleSecondary?: string
+  loginDescription?: string
+}
+
+/** Kulübün adı settings/features içinde; giriş ekranı metinleri oradan gelir. */
+export function toClubIdentity(raw: FirestoreSettings | undefined) {
+  return {
+    primaryName: (raw?.loginTitlePrimary ?? 'SPORTFLOW').trim(),
+    secondaryName: (raw?.loginTitleSecondary ?? '').trim(),
+    description: (raw?.loginDescription ?? '').trim(),
+  }
+}
+
+/** Branşlar ayrı koleksiyonda değil, settings/features belgesindeki dizide tutulur. */
+export function toBranches(raw: FirestoreSettings | undefined) {
+  return (raw?.branches ?? []).map((branch, index) => ({
+    id: branch.id ?? `branch-${index + 1}`,
+    name: branch.name ?? '(isimsiz branş)',
+    slug: branch.slug ?? branch.id ?? `branch-${index + 1}`,
+  }))
+}
+
+export interface AttendanceDocInput {
+  groupId: string
+  date: string
+  coachId: string
+  records: Record<string, { status: string; notes: string }>
+  createdAt?: number
+}
+
+/**
+ * firestore.rules § isValidAttendance: groupId, coachId, date, createdAt, records
+ * alanlarının beşi de zorunlu; createdAt sayı, type verilirse practice|match olmalı.
+ */
+export function buildAttendanceDoc(input: AttendanceDocInput) {
+  return {
+    groupId: input.groupId,
+    date: input.date,
+    coachId: input.coachId,
+    createdAt: input.createdAt ?? Date.now(),
+    type: 'practice' as const,
+    records: input.records,
+  }
+}

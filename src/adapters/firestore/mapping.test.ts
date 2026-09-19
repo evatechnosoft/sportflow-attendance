@@ -4,8 +4,10 @@ import {
   fromAttendanceStatus,
   sessionDocId,
   toAttendanceStatus,
+  toBranches,
   toGroup,
   toPlayer,
+  buildAttendanceDoc,
 } from './mapping'
 
 describe('durum çevirisi', () => {
@@ -71,5 +73,36 @@ describe('toGroup', () => {
 describe('sessionDocId', () => {
   it('eski uygulamanın belge kimliği biçimini üretir', () => {
     expect(sessionDocId('g1', '2026-09-21')).toBe('g1_2026-09-21')
+  })
+})
+
+describe('toBranches', () => {
+  it('branşları settings belgesinden okur', () => {
+    const branches = toBranches({ branches: [{ id: 'volleyball', name: 'Voleybol' }] })
+    expect(branches).toEqual([{ id: 'volleyball', name: 'Voleybol', slug: 'volleyball' }])
+  })
+
+  it('settings yoksa boş liste döner', () => {
+    expect(toBranches(undefined)).toEqual([])
+  })
+})
+
+describe('buildAttendanceDoc', () => {
+  const doc = buildAttendanceDoc({
+    groupId: 'g1',
+    date: '2026-09-21',
+    coachId: 'uid-1',
+    records: { a1: { status: 'Geldi', notes: '' } },
+  })
+
+  it('kuralların zorunlu tuttuğu beş alanı taşır', () => {
+    for (const key of ['groupId', 'coachId', 'date', 'createdAt', 'records']) {
+      expect(doc).toHaveProperty(key)
+    }
+  })
+
+  it('createdAt sayıdır ve type izinli değerdir', () => {
+    expect(typeof doc.createdAt).toBe('number')
+    expect(['practice', 'match']).toContain(doc.type)
   })
 })

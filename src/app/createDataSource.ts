@@ -28,9 +28,12 @@ export function createDataSource(env: ImportMetaEnv): DataSourceHandle {
   }
 
   const allowWrites = env.VITE_FIRESTORE_WRITES === 'on'
-  const { db } = initFirebase(config)
+  const { db, auth } = initFirebase(config)
   return {
-    dataSource: createFirestoreDataSource(db, { allowWrites }),
+    dataSource: createFirestoreDataSource(db, {
+      allowWrites,
+      currentUserId: () => auth.currentUser?.uid ?? null,
+    }),
     kind: 'firestore',
     writable: allowWrites,
     requiresAuth: true,

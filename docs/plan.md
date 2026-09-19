@@ -31,3 +31,26 @@ Contract test aynı kalır — decorator da onu geçmek zorunda.
 
 ## Kapsam dışı (şimdilik)
 Ödeme, veli portalı, mesajlaşma, maç/değerlendirme. Port arayüzü eklenerek sonra girer.
+
+## Canlı Firestore bağlantısı — doğrulanan gerçekler (2026-09-19)
+
+Proje `anadoluspor-7ecc2`. Kurallar (`firestore.rules`, eski repodan):
+
+| Koleksiyon | Okuma | Not |
+|---|---|---|
+| `settings/{doc}` | `if true` | giriş gerekmez; branşlar ve kulüp adı burada |
+| `groups` | `isSignedIn()` | girişsiz istek 403 döner (doğrulandı) |
+| `athletes` | `isSignedIn()` | `list` herkese açık değil, imza şart |
+| `attendance` | `isSignedIn()` | yazma `isValidAttendance` şartlarına bağlı |
+
+Yazma sözleşmesi: `groupId, coachId, date, createdAt, records` beşi zorunlu,
+`createdAt` sayı, `type` verilirse `practice|match`, `coachId == request.auth.uid`
+(veya admin/staff). `buildAttendanceDoc` bunu üretir.
+
+**Şema tuzağı:** branş ayrı koleksiyon değil — `settings/features.branches` dizisi.
+Canlıdaki değerler: VOLEYBOL (4 kriter), BASKETBOL (3), TENİS (1).
+
+**Yetkili domainler** (Identity Toolkit): `localhost`, `127.0.0.1`, `192.168.1.187`,
+`anadoluspor-7ecc2.firebaseapp.com`, `anadoluspor-7ecc2.web.app`.
+`evatechnosoft.github.io` **listede yok** → Pages sürümünde Google girişi çalışmaz,
+Firebase Console > Authentication > Settings > Authorized domains'e eklenmeli.

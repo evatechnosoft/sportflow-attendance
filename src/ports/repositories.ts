@@ -2,6 +2,7 @@ import type {
   Attendance,
   AttendanceStatus,
   Branch,
+  ClubIdentity,
   Group,
   Id,
   Player,
@@ -56,6 +57,11 @@ export interface AttendanceRepository {
   mark(sessionId: Id, marks: AttendanceMark[]): Promise<Attendance[]>
 }
 
+export interface SettingsRepository {
+  /** Kulüp adı ve alt başlık — giriş ekranı ve başlık buradan beslenir. */
+  clubIdentity(): Promise<ClubIdentity>
+}
+
 export interface DataSource {
   schools: SchoolRepository
   branches: BranchRepository
@@ -63,4 +69,5 @@ export interface DataSource {
   players: PlayerRepository
   sessions: SessionRepository
   attendance: AttendanceRepository
+  settings: SettingsRepository
 }

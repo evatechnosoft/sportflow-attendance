@@ -59,3 +59,9 @@ export interface Attendance {
   note?: string
   markedAt: string
 }
+
+export interface ClubIdentity {
+  primaryName: string
+  secondaryName: string
+  description: string
+}

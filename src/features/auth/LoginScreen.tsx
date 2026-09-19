@@ -1,19 +1,29 @@
+import type { ClubIdentity } from '../../domain/types'
+
 export function LoginScreen({
   onSignIn,
   error,
+  club,
   projectId,
 }: {
   onSignIn: () => void
   error?: string
+  club?: ClubIdentity
   projectId?: string
 }) {
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center gap-6 px-4 text-center">
       <div>
-        <h2 className="font-display text-3xl font-semibold tracking-tight">Kulüp verisine bağlan</h2>
-        <p className="mt-2 max-w-sm text-sm text-ink/60">
-          Yoklama listeleri kulübün Firestore veritabanından geliyor. Devam etmek için kulüp
-          hesabınla giriş yap.
+        <h2 className="font-display text-3xl font-semibold tracking-tight">
+          {club?.primaryName ?? 'SportFlow'}
+          {club?.secondaryName && <span className="block text-brand">{club.secondaryName}</span>}
+        </h2>
+        <p className="mt-2 text-xs font-medium tracking-widest text-ink/40">
+          {club?.description ?? 'YOKLAMA VE KATILIM TAKİBİ'}
+        </p>
+        <p className="mt-4 max-w-sm text-sm text-ink/60">
+          Yoklama listeleri kulübün veritabanından geliyor. Devam etmek için kulüp hesabınla giriş
+          yap.
         </p>
       </div>
 
