@@ -3,13 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDataSource } from '../../app/dataSource'
 import type { AttendanceStatus } from '../../domain/types'
 import { useGroupOptions } from './useGroupOptions'
-
-const STATUS_BUTTONS: { value: AttendanceStatus; label: string; classes: string }[] = [
-  { value: 'present', label: 'Var', classes: 'bg-brand text-white' },
-  { value: 'late', label: 'Geç', classes: 'bg-warn text-white' },
-  { value: 'excused', label: 'İzinli', classes: 'bg-ink/70 text-white' },
-  { value: 'absent', label: 'Yok', classes: 'bg-danger text-white' },
-]
+import { AttendanceRow } from './AttendanceRow'
 
 const todayIso = () => new Date().toISOString().slice(0, 10)
 
@@ -113,32 +107,12 @@ export function AttendanceScreen() {
 
       <ul className="space-y-2">
         {players.data?.map((player) => (
-          <li
+          <AttendanceRow
             key={player.id}
-            className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-white px-4 py-3 shadow-sm"
-          >
-            <span className="font-medium">
-              {player.firstName} {player.lastName}
-            </span>
-            <div className="flex gap-1">
-              {STATUS_BUTTONS.map((button) => {
-                const active = marks[player.id] === button.value
-                return (
-                  <button
-                    key={button.value}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setMarks((prev) => ({ ...prev, [player.id]: button.value }))}
-                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
-                      active ? button.classes : 'bg-surface text-ink/50 hover:text-ink'
-                    }`}
-                  >
-                    {button.label}
-                  </button>
-                )
-              })}
-            </div>
-          </li>
+            player={player}
+            status={marks[player.id]}
+            onChange={(status) => setMarks((prev) => ({ ...prev, [player.id]: status }))}
+          />
         ))}
       </ul>
 
