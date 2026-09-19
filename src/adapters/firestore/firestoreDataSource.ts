@@ -14,6 +14,7 @@ import type { AttendanceMark, DataSource, GroupFilter } from '../../ports/reposi
 import {
   UNASSIGNED_SCHOOL,
   buildAttendanceDoc,
+  dedupeGroups,
   fromAttendanceStatus,
   sessionDocId,
   toAttendanceStatus,
@@ -51,7 +52,7 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
 
   const loadGroups = async (): Promise<Group[]> => {
     const snapshot = await getDocs(collection(db, 'groups'))
-    return snapshot.docs.map((row) => toGroup(row.id, row.data() as FirestoreGroup))
+    return dedupeGroups(snapshot.docs.map((row) => toGroup(row.id, row.data() as FirestoreGroup)))
   }
 
   return {

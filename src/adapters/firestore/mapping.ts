@@ -70,13 +70,14 @@ export interface FirestoreGroup {
 }
 
 export function toGroup(id: string, raw: FirestoreGroup): Group {
+  const startTime = raw.startTime ?? raw.sessionTime
   return {
     id,
-    name: raw.name ?? '(isimsiz grup)',
+    name: groupDisplayName(raw.name, startTime),
     branchId: raw.branchId ?? '',
     schoolId: raw.schoolId ?? UNASSIGNED_SCHOOL,
     coachName: raw.coachId,
-    schedule: [],
+    schedule: startTime ? [{ weekday: 0, startTime, durationMinutes: 90 }] : [],
   }
 }
 
@@ -131,4 +132,25 @@ export function buildAttendanceDoc(input: AttendanceDocInput) {
     type: 'practice' as const,
     records: input.records,
   }
+}
+
+/**
+ * Canlı veride aynı grup defalarca oluşmuş (demo seed + mükerrer kayıt):
+ * 32 belgenin çoğu aynı ad/branş/saat üçlüsü. Seçicide bir kez görünsün.
+ * ponytail: görüntüde tekilleştirme; asıl temizlik Firestore tarafında yapılmalı.
+ */
+export function dedupeGroups(groups: Group[]): Group[] {
+  const seen = new Map<string, Group>()
+  for (const group of groups) {
+    const key = `${group.name.toLocaleLowerCase('tr')}|${group.branchId}|${group.schedule[0]?.startTime ?? ''}`
+    if (!seen.has(key)) seen.set(key, group)
+  }
+  return [...seen.values()]
+}
+
+/** İsimsiz gruplar saatleriyle anılır (eski veride adı boş kayıtlar var). */
+export function groupDisplayName(name: string | undefined, startTime?: string): string {
+  const trimmed = (name ?? '').trim()
+  if (trimmed) return trimmed
+  return startTime ? `${startTime} grubu` : '(isimsiz grup)'
 }

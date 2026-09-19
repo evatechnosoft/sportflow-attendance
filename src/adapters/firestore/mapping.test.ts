@@ -4,6 +4,8 @@ import {
   fromAttendanceStatus,
   sessionDocId,
   toAttendanceStatus,
+  dedupeGroups,
+  groupDisplayName,
   toBranches,
   toGroup,
   toPlayer,
@@ -104,5 +106,35 @@ describe('buildAttendanceDoc', () => {
   it('createdAt sayıdır ve type izinli değerdir', () => {
     expect(typeof doc.createdAt).toBe('number')
     expect(['practice', 'match']).toContain(doc.type)
+  })
+})
+
+describe('dedupeGroups', () => {
+  const make = (id: string, name: string, startTime?: string) =>
+    toGroup(id, { name, branchId: 'volleyball', startTime })
+
+  it('aynı ad/branş/saat üçlüsü bir kez görünür', () => {
+    const groups = dedupeGroups([
+      make('g1', 'Mini Kız A', '09:00'),
+      make('g2', 'Mini Kız A', '09:00'),
+      make('g3', 'Mini Kız B', '10:00'),
+    ])
+    expect(groups.map((group) => group.id)).toEqual(['g1', 'g3'])
+  })
+
+  it('saati farklı olan aynı ad ayrı gruptur', () => {
+    const groups = dedupeGroups([make('g1', 'Midi Kız A', '11:00'), make('g2', 'Midi Kız A', '16:00')])
+    expect(groups).toHaveLength(2)
+  })
+})
+
+describe('groupDisplayName', () => {
+  it('adı boş grup saatiyle anılır', () => {
+    expect(groupDisplayName('', '09:00')).toBe('09:00 grubu')
+    expect(groupDisplayName(undefined, undefined)).toBe('(isimsiz grup)')
+  })
+
+  it('adı olan grubun adı korunur', () => {
+    expect(groupDisplayName('Yıldız Kız A', '17:00')).toBe('Yıldız Kız A')
   })
 })
