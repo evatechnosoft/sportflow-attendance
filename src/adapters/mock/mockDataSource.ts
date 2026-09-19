@@ -15,6 +15,7 @@ import type {
 } from '../../ports/repositories'
 
 export interface MockSeed {
+  clubIdentity?: { primaryName: string; secondaryName: string; description: string }
   schools?: School[]
   branches?: Branch[]
   groups?: Group[]
@@ -33,6 +34,11 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
   const players = clone(seed.players ?? [])
   const sessions = clone(seed.sessions ?? [])
   const attendance = clone(seed.attendance ?? [])
+  const clubIdentity = seed.clubIdentity ?? {
+    primaryName: 'SPORTFLOW',
+    secondaryName: 'DEMO KULÜBÜ',
+    description: 'OKUL BAZLI YOKLAMA — ÖRNEK VERİ',
+  }
 
   let counter = 0
   const nextId = (prefix: string) => `${prefix}-${++counter}`
@@ -151,6 +157,12 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
       },
       async listByGroup(groupId) {
         return clone(sessions.filter((row) => row.groupId === groupId))
+      },
+    },
+
+    settings: {
+      async clubIdentity() {
+        return { ...clubIdentity }
       },
     },
 
