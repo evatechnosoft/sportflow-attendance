@@ -1,0 +1,152 @@
+import { beforeEach, describe, expect, it } from 'vitest'
+import type { DataSource } from '../ports/repositories'
+import type { Group, Id } from '../domain/types'
+
+/**
+ * Her DataSource adapter'ı (mock, api, ...) bu sözleşmeyi geçmek zorundadır.
+ * Spec: docs/spec.md § Kullanıcı hikâyeleri
+ */
+export function runDataSourceContract(name: string, makeDataSource: () => DataSource) {
+  describe(`${name} — DataSource contract`, () => {
+    let db: DataSource
+
+    beforeEach(() => {
+      db = makeDataSource()
+    })
+
+    let seedCount = 0
+    const seedGroup = async (overrides: Partial<Omit<Group, 'id'>> = {}) => {
+      const suffix = ++seedCount
+      const school = await db.schools.create({ name: `Atatürk Ortaokulu ${suffix}` })
+      const branch = await db.branches.create({ name: `Voleybol ${suffix}`, slug: `voleybol-${suffix}` })
+      return db.groups.create({
+        name: 'U14 Kız',
+        schoolId: school.id,
+        branchId: branch.id,
+        schedule: [{ weekday: 2, startTime: '17:00', durationMinutes: 90 }],
+        ...overrides,
+      })
+    }
+
+    const seedPlayer = async (groupId: Id, firstName = 'Can') =>
+      db.players.create({ firstName, lastName: 'Erdoğan', groupId, status: 'active' })
+
+    describe('US-2 okul / branş / grup', () => {
+      it('okul adı tekildir', async () => {
+        await db.schools.create({ name: 'Atatürk Ortaokulu' })
+        await expect(db.schools.create({ name: 'Atatürk Ortaokulu' })).rejects.toMatchObject({
+          code: 'duplicate',
+        })
+      })
+
+      it('branş slug tekildir', async () => {
+        await db.branches.create({ name: 'Voleybol', slug: 'voleybol' })
+        await expect(db.branches.create({ name: 'Voleybol B', slug: 'voleybol' })).rejects.toMatchObject({
+          code: 'duplicate',
+        })
+      })
+
+      it('olmayan okula grup açılamaz', async () => {
+        const branch = await db.branches.create({ name: 'Basketbol', slug: 'basketbol' })
+        await expect(
+          db.groups.create({ name: 'U12', schoolId: 'yok', branchId: branch.id, schedule: [] }),
+        ).rejects.toMatchObject({ code: 'not_found' })
+      })
+
+      it('olmayan branşa grup açılamaz', async () => {
+        const school = await db.schools.create({ name: 'Cumhuriyet İÖO' })
+        await expect(
+          db.groups.create({ name: 'U12', schoolId: school.id, branchId: 'yok', schedule: [] }),
+        ).rejects.toMatchObject({ code: 'not_found' })
+      })
+
+      it('grup okula ve branşa göre filtrelenir', async () => {
+        const group = await seedGroup()
+        expect(await db.groups.list({ schoolId: group.schoolId })).toHaveLength(1)
+        expect(await db.groups.list({ schoolId: 'baska-okul' })).toHaveLength(0)
+        expect(await db.groups.list({ branchId: group.branchId })).toHaveLength(1)
+      })
+
+      it('oyuncusu olan grup silinemez', async () => {
+        const group = await seedGroup()
+        await seedPlayer(group.id)
+        await expect(db.groups.remove(group.id)).rejects.toMatchObject({ code: 'in_use' })
+      })
+
+      it('boş grup silinir', async () => {
+        const group = await seedGroup()
+        await db.groups.remove(group.id)
+        expect(await db.groups.list()).toHaveLength(0)
+      })
+    })
+
+    describe('US-3 oyuncu', () => {
+      it('olmayan gruba oyuncu eklenemez', async () => {
+        await expect(
+          db.players.create({ firstName: 'Ada', lastName: 'Yıldız', groupId: 'yok', status: 'active' }),
+        ).rejects.toMatchObject({ code: 'not_found' })
+      })
+
+      it('pasif oyuncu varsayılan listede çıkmaz, includeInactive ile çıkar', async () => {
+        const group = await seedGroup()
+        const player = await seedPlayer(group.id)
+        await db.players.setStatus(player.id, 'inactive')
+        expect(await db.players.listByGroup(group.id)).toHaveLength(0)
+        expect(await db.players.listByGroup(group.id, { includeInactive: true })).toHaveLength(1)
+      })
+    })
+
+    describe('US-1 yoklama', () => {
+      it('aynı grup + tarih için ikinci oturum açılmaz', async () => {
+        const group = await seedGroup()
+        const first = await db.sessions.ensure(group.id, '2026-09-21', '17:00')
+        const second = await db.sessions.ensure(group.id, '2026-09-21')
+        expect(second.id).toBe(first.id)
+        expect(await db.sessions.listByGroup(group.id)).toHaveLength(1)
+      })
+
+      it('olmayan gruba oturum açılamaz', async () => {
+        await expect(db.sessions.ensure('yok', '2026-09-21')).rejects.toMatchObject({
+          code: 'not_found',
+        })
+      })
+
+      it('işaretlenen durumlar oturum tekrar açılınca geri gelir', async () => {
+        const group = await seedGroup()
+        const player = await seedPlayer(group.id)
+        const session = await db.sessions.ensure(group.id, '2026-09-21')
+        await db.attendance.mark(session.id, [{ playerId: player.id, status: 'late', note: 'servis' }])
+
+        const saved = await db.attendance.listBySession(session.id)
+        expect(saved).toHaveLength(1)
+        expect(saved[0]).toMatchObject({ playerId: player.id, status: 'late', note: 'servis' })
+      })
+
+      it('aynı oyuncu ikinci kez işaretlenince üzerine yazar', async () => {
+        const group = await seedGroup()
+        const player = await seedPlayer(group.id)
+        const session = await db.sessions.ensure(group.id, '2026-09-21')
+        await db.attendance.mark(session.id, [{ playerId: player.id, status: 'absent' }])
+        await db.attendance.mark(session.id, [{ playerId: player.id, status: 'present' }])
+
+        const saved = await db.attendance.listBySession(session.id)
+        expect(saved).toHaveLength(1)
+        expect(saved[0].status).toBe('present')
+      })
+
+      it('gruba ait olmayan oyuncu o oturumda işaretlenemez', async () => {
+        const group = await seedGroup()
+        const other = await seedGroup({ name: 'U16 Erkek' })
+        const stranger = await seedPlayer(other.id, 'Deniz')
+        const session = await db.sessions.ensure(group.id, '2026-09-21')
+        await expect(
+          db.attendance.mark(session.id, [{ playerId: stranger.id, status: 'present' }]),
+        ).rejects.toMatchObject({ code: 'not_found' })
+      })
+
+      it('olmayan oturuma yoklama yazılamaz', async () => {
+        await expect(db.attendance.mark('yok', [])).rejects.toMatchObject({ code: 'not_found' })
+      })
+    })
+  })
+}
