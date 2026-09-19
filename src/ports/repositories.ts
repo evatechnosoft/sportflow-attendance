@@ -8,6 +8,7 @@ import type {
   Player,
   School,
   Session,
+  SessionSummary,
 } from '../domain/types'
 
 export interface SchoolRepository {
@@ -55,6 +56,8 @@ export interface AttendanceRepository {
   listBySession(sessionId: Id): Promise<Attendance[]>
   /** Oyuncu başına tek kayıt: var olanın üzerine yazar. */
   mark(sessionId: Id, marks: AttendanceMark[]): Promise<Attendance[]>
+  /** Grubun kayıtlı oturumları, yeniden eskiye — geçmişe dönüp düzeltmek için. */
+  historyByGroup(groupId: Id): Promise<SessionSummary[]>
 }
 
 export interface SettingsRepository {

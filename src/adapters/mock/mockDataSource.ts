@@ -1,6 +1,7 @@
 import { duplicate, inUse, notFound } from '../../domain/errors'
 import type {
   Attendance,
+  AttendanceStatus,
   Branch,
   Group,
   Id,
@@ -25,6 +26,13 @@ export interface MockSeed {
 }
 
 const clone = <T>(rows: T[]): T[] => rows.map((row) => ({ ...row }))
+
+export const emptyCounts = (): Record<AttendanceStatus, number> => ({
+  present: 0,
+  absent: 0,
+  late: 0,
+  excused: 0,
+})
 
 /** In-memory adapter. Ağ yok, kalıcılık yok — UI'ı gerçek veri kaynağından önce çalıştırır. */
 export function createMockDataSource(seed: MockSeed = {}): DataSource {
@@ -195,6 +203,19 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
           }
         }
         return clone(attendance.filter((row) => row.sessionId === sessionId))
+      },
+
+      async historyByGroup(groupId) {
+        const groupSessions = sessions.filter((row) => row.groupId === groupId)
+        return groupSessions
+          .map((session) => {
+            const rows = attendance.filter((row) => row.sessionId === session.id)
+            const counts = emptyCounts()
+            for (const row of rows) counts[row.status] += 1
+            return { sessionId: session.id, date: session.date, counts, total: rows.length }
+          })
+          .filter((summary) => summary.total > 0)
+          .sort((a, b) => b.date.localeCompare(a.date))
       },
     },
   }

@@ -9,6 +9,7 @@ import {
   type Firestore,
 } from 'firebase/firestore'
 import { DomainError, notFound } from '../../domain/errors'
+import { emptyCounts } from '../mock/mockDataSource'
 import type { Attendance, Group, School } from '../../domain/types'
 import type { AttendanceMark, DataSource, GroupFilter } from '../../ports/repositories'
 import {
@@ -158,6 +159,33 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
           })
         }
         return rows
+      },
+
+      // Tek sorgu: grubun tüm yoklama belgeleri, her biri records haritası taşıyor.
+      async historyByGroup(groupId) {
+        const snapshot = await getDocs(
+          query(collection(db, 'attendance'), where('groupId', '==', groupId)),
+        )
+        return snapshot.docs
+          .map((row) => {
+            const records = (row.data().records ?? {}) as Record<string, { status?: unknown }>
+            const counts = emptyCounts()
+            let total = 0
+            for (const record of Object.values(records)) {
+              const status = toAttendanceStatus(record.status)
+              if (!status) continue
+              counts[status] += 1
+              total += 1
+            }
+            return {
+              sessionId: row.id,
+              date: (row.data().date as string) ?? row.id.split('_').pop() ?? '',
+              counts,
+              total,
+            }
+          })
+          .filter((summary) => summary.total > 0)
+          .sort((a, b) => b.date.localeCompare(a.date))
       },
 
       async mark(sessionId, marks: AttendanceMark[]) {

@@ -65,3 +65,10 @@ export interface ClubIdentity {
   secondaryName: string
   description: string
 }
+
+export interface SessionSummary {
+  sessionId: Id
+  date: string
+  counts: Record<AttendanceStatus, number>
+  total: number
+}

@@ -4,6 +4,7 @@ import { useDataSource } from '../../app/dataSource'
 import type { AttendanceStatus } from '../../domain/types'
 import { useGroupOptions } from './useGroupOptions'
 import { AttendanceRow } from './AttendanceRow'
+import { SessionHistory } from './SessionHistory'
 
 const todayIso = () => new Date().toISOString().slice(0, 10)
 
@@ -44,13 +45,22 @@ export function AttendanceScreen() {
     setMarks(Object.fromEntries(saved.data.map((row) => [row.playerId, row.status])))
   }, [saved.data])
 
+  const history = useQuery({
+    queryKey: ['history', groupId],
+    enabled: Boolean(groupId),
+    queryFn: () => db.attendance.historyByGroup(groupId),
+  })
+
   const save = useMutation({
     mutationFn: () =>
       db.attendance.mark(
         session.data!.id,
         Object.entries(marks).map(([playerId, status]) => ({ playerId, status })),
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['attendance', session.data?.id] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance', session.data?.id] })
+      queryClient.invalidateQueries({ queryKey: ['history', groupId] })
+    },
   })
 
   const summary = useMemo(() => {
@@ -61,6 +71,7 @@ export function AttendanceScreen() {
   }, [marks, players.data])
 
   const selected = groups.data?.find((group) => group.id === groupId)
+  const alreadySaved = (saved.data?.length ?? 0) > 0
   const failure = [groups.error, players.error, session.error, saved.error, save.error].find(
     Boolean,
   )
@@ -108,7 +119,12 @@ export function AttendanceScreen() {
         </label>
         {selected && (
           <p className="text-xs text-ink/50 sm:col-span-2">
-            {selected.branchName} · Antrenör: {selected.coachName ?? '—'}
+            {selected.branchName}
+            {alreadySaved && (
+              <span className="ml-2 rounded-full bg-brand/10 px-2 py-0.5 font-medium text-brand">
+                bu gün kayıtlı · düzeltebilirsin
+              </span>
+            )}
           </p>
         )}
       </div>
@@ -146,9 +162,15 @@ export function AttendanceScreen() {
         onClick={() => save.mutate()}
         className="w-full rounded-2xl bg-brand py-3 font-display font-semibold text-white shadow-sm transition disabled:opacity-40"
       >
-        {save.isPending ? 'Kaydediliyor…' : 'Yoklamayı kaydet'}
+        {save.isPending ? 'Kaydediliyor…' : alreadySaved ? 'Düzeltmeyi kaydet' : 'Yoklamayı kaydet'}
       </button>
       {save.isSuccess && <p className="text-center text-sm text-brand">Kaydedildi.</p>}
+
+      <SessionHistory
+        history={history.data ?? []}
+        selectedDate={date}
+        onPick={(picked) => setDate(picked)}
+      />
     </section>
   )
 }

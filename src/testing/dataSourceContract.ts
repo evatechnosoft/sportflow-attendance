@@ -151,6 +151,46 @@ export function runDataSourceContract(name: string, makeDataSource: () => DataSo
         ).rejects.toMatchObject({ code: 'not_found' })
       })
 
+      it('kaydedilen oturum grubun geçmişinde özetiyle görünür', async () => {
+        const group = await seedGroup()
+        const player = await seedPlayer(group.id)
+        const other = await seedPlayer(group.id, 'Ada')
+        const session = await db.sessions.ensure(group.id, '2026-09-21')
+        await db.attendance.mark(session.id, [
+          { playerId: player.id, status: 'present' },
+          { playerId: other.id, status: 'absent' },
+        ])
+
+        const history = await db.attendance.historyByGroup(group.id)
+        expect(history).toHaveLength(1)
+        expect(history[0]).toMatchObject({ date: '2026-09-21', total: 2 })
+        expect(history[0].counts.present).toBe(1)
+        expect(history[0].counts.absent).toBe(1)
+      })
+
+      it('geçmiş oturum yeniden işaretlenince özet güncellenir', async () => {
+        const group = await seedGroup()
+        const player = await seedPlayer(group.id)
+        const session = await db.sessions.ensure(group.id, '2026-09-14')
+        await db.attendance.mark(session.id, [{ playerId: player.id, status: 'absent' }])
+        await db.attendance.mark(session.id, [{ playerId: player.id, status: 'late' }])
+
+        const [summary] = await db.attendance.historyByGroup(group.id)
+        expect(summary.counts.absent).toBe(0)
+        expect(summary.counts.late).toBe(1)
+      })
+
+      it('geçmiş yeniden eskiye sıralanır', async () => {
+        const group = await seedGroup()
+        const player = await seedPlayer(group.id)
+        for (const date of ['2026-09-07', '2026-09-21', '2026-09-14']) {
+          const session = await db.sessions.ensure(group.id, date)
+          await db.attendance.mark(session.id, [{ playerId: player.id, status: 'present' }])
+        }
+        const history = await db.attendance.historyByGroup(group.id)
+        expect(history.map((row) => row.date)).toEqual(['2026-09-21', '2026-09-14', '2026-09-07'])
+      })
+
       it('olmayan oturuma yoklama yazılamaz', async () => {
         await expect(db.attendance.mark('yok', [])).rejects.toMatchObject({ code: 'not_found' })
       })
