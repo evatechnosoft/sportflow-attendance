@@ -97,25 +97,40 @@ dönsün · eşik geçilince ikon spring ile `1→1.25→1`, zemin tam renge boy
 `navigator.vibrate(10)` · bırakınca zıplamasın, 150ms spring ile yerleşsin ·
 `info.velocity.x` hesaba katılsın · 4 sn "Ada → Var · Geri al" toast'ı.
 
-## Görsel yön — Dean'in seçmesi gereken tek şey
+## Görsel yön — karar: iki tema birden [Dean, 2026-09-19]
 
-**A · Açık, nötr, sakin** (UX ajanının önerisi): zemin `#F4F5F3`, yüzey beyaz, mürekkep
-`#16181C`, marka lacivert `#1B2A4A`, durumlar beyazla ≥4.5:1 (`present #0E7A3C`,
-`late #B45309`, `excused #475569`, `absent #B91C1C`), font Bricolage Grotesque + Geist.
-Güneşte okunur, kurumsal, yorucu değil.
+Tek yön seçilmedi; **açık ve koyu iki tam tema** yazılıyor, kullanıcı seçiyor.
 
-**B · Koyu cam, sportif** (eski SportFlow'un kendi dili): bg `#06090f`, cam yüzeyler,
-accent turuncu `#f97316` + mavi `#3b82f6`, Lexend/Sora + Inter. Daha "uygulama" hissi,
-kulüp kimliğine yakın; sahada güneş altında okunurluk riski var.
+**Açık tema** — nötr ve sakin, sahada güneş altında okunur:
+zemin `#F4F5F3`, yüzey `#FFFFFF`, ikincil yüzey `#EDEFEA`, çizgi `#DCDFD8`,
+mürekkep `#16181C` / `#5A6068` / `#8A9098`, marka lacivert `#1B2A4A`,
+durumlar beyazla ≥4.5:1 → `present #0E7A3C`, `late #B45309`, `excused #475569`,
+`absent #B91C1C`, zeminleri `#DCF2E4` / `#FBEBD9` / `#E6E9ED` / `#FAE0E0`.
 
-Her iki durumda da tokenlar tek kaynaktan (`@theme`) gelir ve koyu/açık eşlemesi yazılır;
-seçim yalnız varsayılanı belirler.
+**Koyu tema** — SportFlow'un kendi sportif dili, ölçülü cam:
+zemin `#0F1113`, yüzey `#17191C`, ikincil `#212429`, çizgi `#2C3036`,
+mürekkep `#ECEEF0` / `#A2A8B0` / `#6E757D`, marka `#7FA0E0`,
+durumlar `present #34C77B`, `late #E8A33D`, `excused #97A1AE`, `absent #F0645F`,
+zeminleri `#132B1F` / `#2E2113` / … Cam yalnız **katmanlı** öğede (yapışkan alt bar,
+yüzen kart) — liste kartlarının tamamına uygulanmaz, metin kontrastı gerçek telefonda
+ölçülür.
+
+Kurallar:
+- Her renk `:root` içinde tam olarak bir kez tanımlanır; koyu değerler
+  `@media (prefers-color-scheme: dark)` ve `:root[data-theme="dark"]` bloklarında
+  **yalnız token olarak** ezilir. Bileşenlerde ham hex yok.
+- Varsayılan = sistem tercihi. Üçüncü durum olarak elle seçim (`data-theme` açık/koyu)
+  saklanır — `ui-config.ts` deseni (`theme.mode: light|dark|system`) devralınır.
+- Tipografi iki temada ortak: display Bricolage Grotesque (ya da Lexend), gövde Geist
+  (ya da Inter). Ölçek 28/24/20/16/14/12, lh 1.2 ve 1.5, etiketler uppercase `0.05em`.
+- Durum renkleri iki temada da AA'dan geçmek zorunda; kontrast ölçümü P0'ın kapanış şartı.
 
 ## Uygulama sırası
 
 **P0 — bir oturumda biter, görünür fark büyük**
 1. Fontları gerçekten yükle (`index.html`'e Google Fonts `<link>`, `font-display: swap`)
-2. Token setini `@theme`'e yaz (seçilen yön), durum renklerini AA'ya çıkar
+2. Token setini `@theme`'e yaz — **açık + koyu ikisi birden**, durum renkleri AA'dan geçsin;
+   tema anahtarı (sistem / açık / koyu) ve `data-theme` kalıcılığı aynı adımda
 3. Kaydet butonunu sticky yap, yalnız değişiklik varken göster; "Kaydedildi." 3 sn sonra sönsün
 4. Dokunma hedeflerini 44px'e çıkar, satırı 72px yap
 5. UTC tarih hatasını düzelt (`toLocaleDateString('en-CA')`)
