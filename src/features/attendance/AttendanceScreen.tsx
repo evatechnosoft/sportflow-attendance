@@ -61,17 +61,35 @@ export function AttendanceScreen() {
   }, [marks, players.data])
 
   const selected = groups.data?.find((group) => group.id === groupId)
+  const failure = [groups.error, players.error, session.error, saved.error, save.error].find(
+    Boolean,
+  )
 
   return (
     <section className="space-y-4">
+      {failure && (
+        <p className="rounded-xl bg-danger/10 px-4 py-2 text-sm text-danger">
+          {failure instanceof Error ? failure.message : 'Veri alınamadı'}
+        </p>
+      )}
+      {groups.isLoading && (
+        <p className="rounded-xl bg-white px-4 py-2 text-sm text-ink/50">Gruplar yükleniyor…</p>
+      )}
+      {!groups.isLoading && groups.data?.length === 0 && (
+        <p className="rounded-xl bg-white px-4 py-2 text-sm text-ink/50">
+          Görünür grup yok. Tanımlar sekmesinden grup ekleyebilirsin.
+        </p>
+      )}
       <div className="grid gap-3 rounded-2xl bg-white p-4 shadow-sm sm:grid-cols-2">
         <label className="text-sm">
           <span className="mb-1 block font-medium text-ink/60">Grup</span>
           <select
             value={groupId}
             onChange={(event) => setGroupId(event.target.value)}
-            className="w-full rounded-xl border border-black/10 bg-surface px-3 py-2"
+            disabled={!groups.data?.length}
+            className="w-full rounded-xl border border-black/10 bg-surface px-3 py-2 disabled:opacity-50"
           >
+            {!groups.data?.length && <option value="">Grup yok</option>}
             {groups.data?.map((group) => (
               <option key={group.id} value={group.id}>
                 {group.schoolName} · {group.label}

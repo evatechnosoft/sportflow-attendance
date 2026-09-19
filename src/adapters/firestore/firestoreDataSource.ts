@@ -12,12 +12,12 @@ import { DomainError, notFound } from '../../domain/errors'
 import type { Attendance, Group, School } from '../../domain/types'
 import type { AttendanceMark, DataSource, GroupFilter } from '../../ports/repositories'
 import {
-  UNASSIGNED_SCHOOL,
   buildAttendanceDoc,
   dedupeGroups,
   fromAttendanceStatus,
   sessionDocId,
   toAttendanceStatus,
+  schoolsFromGroups,
   toBranches,
   toClubIdentity,
   toGroup,
@@ -58,17 +58,7 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
   return {
     schools: {
       async list(): Promise<School[]> {
-        const snapshot = await getDocs(collection(db, 'schools'))
-        const schools = snapshot.docs.map((row) => ({
-          id: row.id,
-          name: (row.data().name as string) ?? '(isimsiz okul)',
-        }))
-        // Eski gruplarda okul alanı yok; hepsi tek havuzda görünsün.
-        const groups = await loadGroups()
-        if (groups.some((group) => group.schoolId === UNASSIGNED_SCHOOL)) {
-          schools.push({ id: UNASSIGNED_SCHOOL, name: 'Okul atanmamış' })
-        }
-        return schools
+        return schoolsFromGroups(await loadGroups())
       },
       async create() {
         throw readOnly()

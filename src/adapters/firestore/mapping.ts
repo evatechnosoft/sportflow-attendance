@@ -1,4 +1,4 @@
-import type { AttendanceStatus, Group, Player } from '../../domain/types'
+import type { AttendanceStatus, Group, Player, School } from '../../domain/types'
 
 /**
  * Anadolu Spor Firestore şeması ile bu uygulamanın domain'i arasındaki çeviri.
@@ -153,4 +153,17 @@ export function groupDisplayName(name: string | undefined, startTime?: string): 
   const trimmed = (name ?? '').trim()
   if (trimmed) return trimmed
   return startTime ? `${startTime} grubu` : '(isimsiz grup)'
+}
+
+/**
+ * Canlı şemada `schools` koleksiyonu yok ve kurallar tanımsız yolları reddediyor
+ * (`match /{document=**} allow read: if false`). Okul listesi bu yüzden gruplardan
+ * türetilir; ayrı koleksiyon okunmaz.
+ */
+export function schoolsFromGroups(groups: Group[]): School[] {
+  const ids = new Set(groups.map((group) => group.schoolId))
+  return [...ids].map((id) => ({
+    id,
+    name: id === UNASSIGNED_SCHOOL ? 'Okul atanmamış' : id,
+  }))
 }

@@ -15,10 +15,11 @@ export function useGroupOptions() {
   return useQuery({
     queryKey: ['group-options'],
     queryFn: async (): Promise<GroupOption[]> => {
-      const [groups, schools, branches] = await Promise.all([
-        db.groups.list(),
-        db.schools.list(),
-        db.branches.list(),
+      // Gruplar zorunlu; okul/branş adları süstür. Biri reddedilirse liste yine gelsin.
+      const groups = await db.groups.list()
+      const [schools, branches] = await Promise.all([
+        db.schools.list().catch(() => []),
+        db.branches.list().catch(() => []),
       ])
       const schoolName = new Map(schools.map((row) => [row.id, row.name]))
       const branchName = new Map(branches.map((row) => [row.id, row.name]))
