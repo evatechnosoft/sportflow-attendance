@@ -47,7 +47,7 @@ export function ManageScreen() {
   return (
     <section className="space-y-4">
       {error && (
-        <p className="rounded-xl bg-danger/10 px-4 py-2 text-sm text-danger">{error}</p>
+        <p className="rounded-xl bg-absent-soft px-4 py-2 text-sm text-absent">{error}</p>
       )}
 
       <Card title="Okullar" count={schools.data?.length}>
@@ -71,9 +71,9 @@ export function ManageScreen() {
             const school = schools.data?.find((row) => row.id === group.schoolId)
             const branch = branches.data?.find((row) => row.id === group.branchId)
             return (
-              <li key={group.id} className="flex justify-between rounded-lg bg-surface px-3 py-2">
+              <li key={group.id} className="flex justify-between rounded-lg bg-surface-2 px-3 py-2">
                 <span className="font-medium">{group.name}</span>
-                <span className="text-ink/50">
+                <span className="text-ink-2">
                   {school?.name ?? '—'} · {branch?.name ?? '—'}
                 </span>
               </li>
@@ -95,10 +95,10 @@ function Card({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
+    <div className="rounded-[20px] border border-line bg-surface p-4">
       <div className="mb-3 flex items-baseline justify-between">
         <h2 className="font-display font-semibold">{title}</h2>
-        <span className="text-xs text-ink/40">{count ?? 0} kayıt</span>
+        <span className="text-xs text-ink-3">{count ?? 0} kayıt</span>
       </div>
       {children}
     </div>
@@ -126,9 +126,9 @@ function NameForm({
         onChange={(event) => setValue(event.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="flex-1 rounded-xl border border-black/10 bg-surface px-3 py-2 text-sm"
+        className="flex-1 min-h-11 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
       />
-      <button type="submit" className="rounded-xl bg-brand px-4 py-2 text-sm font-medium text-white">
+      <button type="submit" className="min-h-11 rounded-xl bg-brand px-4 py-2 text-sm font-medium text-bg transition hover:opacity-90">
         Ekle
       </button>
     </form>
@@ -162,13 +162,13 @@ function GroupForm({
         onChange={(event) => setName(event.target.value)}
         placeholder="Grup adı"
         aria-label="Grup adı"
-        className="rounded-xl border border-black/10 bg-surface px-3 py-2 text-sm sm:col-span-2"
+        className="min-h-11 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm sm:col-span-2"
       />
       <select
         value={schoolId}
         onChange={(event) => setSchoolId(event.target.value)}
         aria-label="Okul"
-        className="rounded-xl border border-black/10 bg-surface px-3 py-2 text-sm"
+        className="min-h-11 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
       >
         <option value="">Okul seç</option>
         {schools.map((school) => (
@@ -181,7 +181,7 @@ function GroupForm({
         value={branchId}
         onChange={(event) => setBranchId(event.target.value)}
         aria-label="Branş"
-        className="rounded-xl border border-black/10 bg-surface px-3 py-2 text-sm"
+        className="min-h-11 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
       >
         <option value="">Branş seç</option>
         {branches.map((branch) => (
@@ -192,7 +192,7 @@ function GroupForm({
       </select>
       <button
         type="submit"
-        className="rounded-xl bg-brand px-4 py-2 text-sm font-medium text-white sm:col-span-4"
+        className="min-h-11 rounded-xl bg-brand px-4 py-2 text-sm font-medium text-bg transition hover:opacity-90 sm:col-span-4"
       >
         Grup ekle
       </button>
@@ -204,7 +204,7 @@ function Chips({ items }: { items: string[] }) {
   return (
     <div className="mt-3 flex flex-wrap gap-2">
       {items.map((item) => (
-        <span key={item} className="rounded-full bg-surface px-3 py-1 text-xs text-ink/70">
+        <span key={item} className="rounded-full bg-surface-2 px-3 py-1 text-xs text-ink-2">
           {item}
         </span>
       ))}

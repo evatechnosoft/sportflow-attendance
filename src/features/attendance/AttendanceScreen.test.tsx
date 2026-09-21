@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AttendanceScreen } from './AttendanceScreen'
 import { DataSourceProvider } from '../../app/dataSource'
+import { SelectionProvider } from '../../app/selection'
 import { createMockDataSource } from '../../adapters/mock/mockDataSource'
 import type { DataSource } from '../../ports/repositories'
 
@@ -25,29 +26,38 @@ async function setup() {
   render(
     <QueryClientProvider client={client}>
       <DataSourceProvider value={db}>
-        <AttendanceScreen />
+        <SelectionProvider>
+          <AttendanceScreen />
+        </SelectionProvider>
       </DataSourceProvider>
     </QueryClientProvider>,
   )
   return { db, group }
 }
 
+/** Satırı aç, içindeki durum butonuna bas. */
+async function mark(user: ReturnType<typeof userEvent.setup>, name: string, label: string) {
+  await user.click(screen.getByRole('button', { name }))
+  const row = screen.getByRole('button', { name }).closest('li')
+  if (!row) throw new Error(`"${name}" satırı bulunamadı`)
+  await user.click(within(row).getByRole('button', { name: label }))
+}
+
 describe('AttendanceScreen', () => {
   it('grubun aktif oyuncularını listeler ve işaretlemeyi kaydeder', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     const { db, group } = await setup()
 
     await screen.findByText('Can Erdoğan')
     await screen.findByText('Ada Yıldız')
 
-    const [canRow, adaRow] = screen.getAllByRole('listitem')
-    await user.click(within(canRow, 'Var'))
-    await user.click(within(adaRow, 'Yok'))
+    await mark(user, 'Can Erdoğan', 'Var')
+    await mark(user, 'Ada Yıldız', 'Yok')
 
-    expect(screen.getByText('2/2 işaretlendi')).toBeTruthy()
-    expect(screen.getByText('%50')).toBeTruthy()
+    expect(screen.getByText(/2\/2/)).toBeTruthy()
+    expect(screen.getByText(/%50/)).toBeTruthy()
 
-    await user.click(screen.getByRole('button', { name: 'Yoklamayı kaydet' }))
+    await user.click(screen.getByRole('button', { name: /Kaydet/ }))
 
     await waitFor(async () => {
       const session = (await db.sessions.listByGroup(group.id))[0]
@@ -56,12 +66,12 @@ describe('AttendanceScreen', () => {
       expect(rows.find((row) => row.status === 'absent')).toBeTruthy()
     })
   })
-})
 
-function within(row: HTMLElement, label: string): HTMLElement {
-  const button = Array.from(row.querySelectorAll('button')).find(
-    (candidate) => candidate.textContent === label,
-  )
-  if (!button) throw new Error(`"${label}" butonu bulunamadı`)
-  return button
-}
+  it('işaret yokken "henüz işaretlenmedi" gösterir, kaydet çubuğu görünmez', async () => {
+    await setup()
+
+    await screen.findByText('Can Erdoğan')
+    expect(screen.getByText('henüz işaretlenmedi')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Kaydet/ })).toBeNull()
+  })
+})

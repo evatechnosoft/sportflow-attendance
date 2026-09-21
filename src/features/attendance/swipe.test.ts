@@ -27,3 +27,14 @@ describe('isDrag', () => {
     expect(isDrag(-DRAG_SLOP - 1)).toBe(true)
   })
 })
+
+describe('resolveSwipe · hız', () => {
+  it('hızlı fırlatma kısa mesafeyle de karar verir', () => {
+    expect(resolveSwipe(24, 900)).toBe('present')
+    expect(resolveSwipe(-24, -900)).toBe('absent')
+  })
+  it('ters yönde hız sayılmaz, slop altı hiç sayılmaz', () => {
+    expect(resolveSwipe(24, -900)).toBeNull()
+    expect(resolveSwipe(5, 900)).toBeNull()
+  })
+})

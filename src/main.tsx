@@ -5,6 +5,7 @@ import './index.css'
 import App from './App'
 import { DataSourceProvider } from './app/dataSource'
 import { createDataSource } from './app/createDataSource'
+import { SelectionProvider } from './app/selection'
 
 const handle = createDataSource(import.meta.env)
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -13,7 +14,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <DataSourceProvider value={handle.dataSource}>
-        <App handle={handle} />
+        <SelectionProvider>
+          <App handle={handle} />
+        </SelectionProvider>
       </DataSourceProvider>
     </QueryClientProvider>
   </StrictMode>,

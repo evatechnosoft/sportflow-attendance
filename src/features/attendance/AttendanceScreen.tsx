@@ -1,25 +1,40 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDataSource } from '../../app/dataSource'
+import { useSelection } from '../../app/selection'
 import type { AttendanceStatus } from '../../domain/types'
 import { useGroupOptions } from './useGroupOptions'
 import { AttendanceRow } from './AttendanceRow'
-import { SessionHistory } from './SessionHistory'
+import { GroupSheet } from './GroupSheet'
+import { dayLabel, shiftDay } from './date'
+import { isDirty, marksFromRows, STATUSES, STATUS_LABEL, summarize, type Marks } from './summary'
 
-const todayIso = () => new Date().toISOString().slice(0, 10)
+const SEGMENT: Record<AttendanceStatus, string> = {
+  present: 'bg-present',
+  late: 'bg-late',
+  excused: 'bg-excused',
+  absent: 'bg-absent',
+}
+
+interface Toast {
+  text: string
+  /** Geri-al toast'ında önceki işaret durumu; kaydet toast'ında yok. */
+  undo?: () => void
+}
 
 export function AttendanceScreen() {
   const db = useDataSource()
   const queryClient = useQueryClient()
   const groups = useGroupOptions()
+  const { groupId, date, setGroupId, setDate } = useSelection()
 
-  const [groupId, setGroupId] = useState('')
-  const [date, setDate] = useState(todayIso)
-  const [marks, setMarks] = useState<Record<string, AttendanceStatus>>({})
+  const [marks, setMarks] = useState<Marks>({})
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [toast, setToast] = useState<Toast | null>(null)
 
   useEffect(() => {
     if (!groupId && groups.data?.length) setGroupId(groups.data[0].id)
-  }, [groups.data, groupId])
+  }, [groups.data, groupId, setGroupId])
 
   const session = useQuery({
     queryKey: ['session', groupId, date],
@@ -42,14 +57,8 @@ export function AttendanceScreen() {
   // Kaydedilmiş yoklama tabloya geri yüklenir (US-1).
   useEffect(() => {
     if (!saved.data) return
-    setMarks(Object.fromEntries(saved.data.map((row) => [row.playerId, row.status])))
+    setMarks(marksFromRows(saved.data))
   }, [saved.data])
-
-  const history = useQuery({
-    queryKey: ['history', groupId],
-    enabled: Boolean(groupId),
-    queryFn: () => db.attendance.historyByGroup(groupId),
-  })
 
   const save = useMutation({
     mutationFn: () =>
@@ -59,118 +68,211 @@ export function AttendanceScreen() {
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['attendance', session.data?.id] })
-      queryClient.invalidateQueries({ queryKey: ['history', groupId] })
+      setToast({ text: 'Kaydedildi' })
     },
   })
 
-  const summary = useMemo(() => {
-    const values = Object.values(marks)
-    const present = values.filter((status) => status === 'present' || status === 'late').length
-    const total = players.data?.length ?? 0
-    return { marked: values.length, present, total, rate: total ? Math.round((present / total) * 100) : 0 }
-  }, [marks, players.data])
+  // Tek toast; yenisi eskisini ezer, süre dolunca söner.
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), toast.undo ? 4000 : 3000)
+    return () => clearTimeout(timer)
+  }, [toast])
 
-  const selected = groups.data?.find((group) => group.id === groupId)
-  const alreadySaved = (saved.data?.length ?? 0) > 0
-  const failure = [groups.error, players.error, session.error, saved.error, save.error].find(
-    Boolean,
+  const summary = useMemo(
+    () => summarize(marks, players.data?.length ?? 0),
+    [marks, players.data],
   )
 
+  const selected = groups.data?.find((group) => group.id === groupId)
+  const savedMarks = useMemo(() => marksFromRows(saved.data ?? []), [saved.data])
+  const alreadySaved = (saved.data?.length ?? 0) > 0
+  const dirty = isDirty(marks, savedMarks)
+  const failure = [groups.error, players.error, session.error, saved.error, save.error].find(Boolean)
+  if (failure) console.error('AttendanceScreen', failure)
+
+  const handleChange = (playerId: string, name: string, status: AttendanceStatus) => {
+    const previous = marks[playerId]
+    setMarks((prev) => ({ ...prev, [playerId]: status }))
+    setToast({
+      text: `${name} → ${STATUS_LABEL[status]}`,
+      undo: () =>
+        setMarks((prev) => {
+          if (!previous) {
+            const { [playerId]: _dropped, ...rest } = prev
+            return rest
+          }
+          return { ...prev, [playerId]: previous }
+        }),
+    })
+  }
+
   return (
-    <section className="space-y-4">
-      {failure && (
-        <p className="rounded-xl bg-danger/10 px-4 py-2 text-sm text-danger">
-          {failure instanceof Error ? failure.message : 'Veri alınamadı'}
-        </p>
-      )}
-      {groups.isLoading && (
-        <p className="rounded-xl bg-white px-4 py-2 text-sm text-ink/50">Gruplar yükleniyor…</p>
-      )}
-      {!groups.isLoading && groups.data?.length === 0 && (
-        <p className="rounded-xl bg-white px-4 py-2 text-sm text-ink/50">
-          Görünür grup yok. Tanımlar sekmesinden grup ekleyebilirsin.
-        </p>
-      )}
-      <div className="grid gap-3 rounded-2xl bg-white p-4 shadow-sm sm:grid-cols-2">
-        <label className="text-sm">
-          <span className="mb-1 block font-medium text-ink/60">Grup</span>
-          <select
-            value={groupId}
-            onChange={(event) => setGroupId(event.target.value)}
-            disabled={!groups.data?.length}
-            className="w-full rounded-xl border border-black/10 bg-surface px-3 py-2 disabled:opacity-50"
-          >
-            {!groups.data?.length && <option value="">Grup yok</option>}
-            {groups.data?.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.schoolName} · {group.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm">
-          <span className="mb-1 block font-medium text-ink/60">Tarih</span>
+    <section>
+      {/* 1. Başlık: grup seçici */}
+      <button
+        type="button"
+        onClick={() => setSheetOpen(true)}
+        disabled={!groups.data?.length}
+        className="flex h-14 w-full items-center justify-between gap-3 text-left disabled:opacity-50"
+      >
+        <span className="min-w-0">
+          <span className="block truncate font-display text-xl font-semibold">
+            {selected?.label ?? 'Grup seç'}
+          </span>
+          {selected && (
+            <span className="block truncate text-xs text-ink-2">
+              {selected.schoolName} · {selected.branchName}
+            </span>
+          )}
+        </span>
+        <span aria-hidden="true" className="shrink-0 text-ink-2">
+          ▾
+        </span>
+      </button>
+
+      <GroupSheet
+        open={sheetOpen}
+        groups={groups.data ?? []}
+        groupId={groupId}
+        onSelect={setGroupId}
+        onClose={() => setSheetOpen(false)}
+      />
+
+      {/* 2. Tarih */}
+      <div className="flex items-center gap-2 border-y border-line py-2">
+        <button
+          type="button"
+          aria-label="Önceki gün"
+          onClick={() => setDate(shiftDay(date, -1))}
+          className="h-11 w-11 shrink-0 rounded-full text-ink-2"
+        >
+          ◀
+        </button>
+        <label className="flex min-w-0 flex-1 flex-col items-center">
+          <span className="font-display text-sm font-semibold">{dayLabel(date)}</span>
           <input
             type="date"
+            aria-label="Tarih"
             value={date}
             onChange={(event) => setDate(event.target.value)}
-            className="w-full rounded-xl border border-black/10 bg-surface px-3 py-2"
+            className="bg-transparent text-sm text-ink-2"
           />
         </label>
-        {selected && (
-          <p className="text-xs text-ink/50 sm:col-span-2">
-            {selected.branchName}
-            {alreadySaved && (
-              <span className="ml-2 rounded-full bg-brand/10 px-2 py-0.5 font-medium text-brand">
-                bu gün kayıtlı · düzeltebilirsin
-              </span>
-            )}
-          </p>
+        <button
+          type="button"
+          aria-label="Sonraki gün"
+          onClick={() => setDate(shiftDay(date, 1))}
+          className="h-11 w-11 shrink-0 rounded-full text-ink-2"
+        >
+          ▶
+        </button>
+        {alreadySaved && (
+          <span className="shrink-0 rounded-full bg-present-soft px-2 py-1 text-xs font-medium text-present">
+            ● kayıtlı
+          </span>
         )}
       </div>
 
-      <div className="flex items-center justify-between rounded-2xl bg-ink px-4 py-3 text-white">
-        <div>
-          <p className="font-display text-2xl font-semibold">%{summary.rate}</p>
-          <p className="text-xs text-white/60">katılım</p>
+      {/* 3. Yığılmış ilerleme */}
+      <div className="py-3">
+        <div className="flex h-2 overflow-hidden rounded-full bg-surface-2">
+          {STATUSES.map((status) => (
+            <span
+              key={status}
+              className={SEGMENT[status]}
+              style={{
+                width: summary.total ? `${(summary.counts[status] / summary.total) * 100}%` : '0%',
+              }}
+            />
+          ))}
         </div>
-        <p className="text-sm text-white/80">
-          {summary.marked}/{summary.total} işaretlendi
-        </p>
+        <div className="mt-1 flex items-baseline justify-between gap-2 text-xs text-ink-2">
+          {summary.marked === 0 ? (
+            <span>henüz işaretlenmedi</span>
+          ) : (
+            <span className="truncate">
+              {STATUSES.filter((status) => summary.counts[status] > 0)
+                .map((status) => `${summary.counts[status]} ${STATUS_LABEL[status].toLocaleLowerCase('tr-TR')}`)
+                .join(' · ')}
+            </span>
+          )}
+          <span className="shrink-0 font-medium text-ink">
+            {summary.marked}/{summary.total}
+            {summary.rate !== null && ` · %${summary.rate}`}
+          </span>
+        </div>
       </div>
 
-      <ul className="space-y-2">
+      {/* 4-5. Liste ve boş/hata durumları */}
+      {failure && (
+        <p className="rounded-2xl bg-absent-soft px-4 py-3 text-sm text-absent">
+          Veri alınamadı, bağlantını kontrol et.
+        </p>
+      )}
+      {!groups.isLoading && groups.data?.length === 0 && (
+        <p className="rounded-2xl bg-surface px-4 py-6 text-center text-sm text-ink-2">
+          Görünür grup yok. Tanımlar sekmesinden grup ekleyebilirsin.
+        </p>
+      )}
+
+      <ul className="space-y-2 pb-40">
         {players.data?.map((player) => (
           <AttendanceRow
             key={player.id}
             player={player}
             status={marks[player.id]}
-            onChange={(status) => setMarks((prev) => ({ ...prev, [player.id]: status }))}
+            onChange={(status) =>
+              handleChange(player.id, `${player.firstName} ${player.lastName}`, status)
+            }
           />
         ))}
       </ul>
 
       {players.data?.length === 0 && (
-        <p className="rounded-2xl bg-white px-4 py-6 text-center text-sm text-ink/50">
+        <p className="rounded-2xl bg-surface px-4 py-6 text-center text-sm text-ink-2">
           Bu grupta aktif oyuncu yok.
         </p>
       )}
 
-      <button
-        type="button"
-        disabled={!session.data || summary.marked === 0 || save.isPending}
-        onClick={() => save.mutate()}
-        className="w-full rounded-2xl bg-brand py-3 font-display font-semibold text-white shadow-sm transition disabled:opacity-40"
-      >
-        {save.isPending ? 'Kaydediliyor…' : alreadySaved ? 'Düzeltmeyi kaydet' : 'Yoklamayı kaydet'}
-      </button>
-      {save.isSuccess && <p className="text-center text-sm text-brand">Kaydedildi.</p>}
+      {/* 6. Sticky kaydet */}
+      {dirty && (
+        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 mx-auto max-w-3xl px-4">
+          <div className="rounded-[20px] border border-line bg-surface/90 p-2 backdrop-blur">
+            <button
+              type="button"
+              disabled={!session.data || save.isPending}
+              onClick={() => save.mutate()}
+              className="h-[52px] w-full rounded-2xl bg-brand font-display font-semibold text-bg disabled:opacity-40"
+            >
+              {save.isPending
+                ? 'Kaydediliyor…'
+                : `${alreadySaved ? 'Düzeltmeyi kaydet' : 'Kaydet'} · ${summary.marked} işaret`}
+            </button>
+          </div>
+        </div>
+      )}
 
-      <SessionHistory
-        history={history.data ?? []}
-        selectedDate={date}
-        onPick={(picked) => setDate(picked)}
-      />
+      {/* 7-8. Tek toast yeri */}
+      {toast && (
+        <div className="fixed inset-x-0 bottom-[calc(128px+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-3xl justify-center px-4">
+          <div className="flex items-center gap-3 rounded-full bg-present px-4 py-2 text-sm font-medium text-bg">
+            <span>{toast.text}</span>
+            {toast.undo && (
+              <button
+                type="button"
+                onClick={() => {
+                  toast.undo?.()
+                  setToast(null)
+                }}
+                className="underline"
+              >
+                Geri al
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   )
 }

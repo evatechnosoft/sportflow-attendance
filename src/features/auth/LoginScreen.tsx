@@ -18,10 +18,10 @@ export function LoginScreen({
           {club?.primaryName ?? 'SportFlow'}
           {club?.secondaryName && <span className="block text-brand">{club.secondaryName}</span>}
         </h2>
-        <p className="mt-2 text-xs font-medium tracking-widest text-ink/40">
+        <p className="mt-2 text-xs font-medium tracking-widest text-ink-3">
           {club?.description ?? 'YOKLAMA VE KATILIM TAKİBİ'}
         </p>
-        <p className="mt-4 max-w-sm text-sm text-ink/60">
+        <p className="mt-4 max-w-sm text-sm text-ink-2">
           Yoklama listeleri kulübün veritabanından geliyor. Devam etmek için kulüp hesabınla giriş
           yap.
         </p>
@@ -30,13 +30,13 @@ export function LoginScreen({
       <button
         type="button"
         onClick={onSignIn}
-        className="rounded-2xl bg-brand px-6 py-3 font-display font-semibold text-white shadow-sm transition hover:bg-brand-light"
+        className="min-h-11 rounded-[20px] bg-brand px-6 py-3 font-display font-semibold text-bg transition hover:opacity-90"
       >
         Google ile giriş yap
       </button>
 
-      {error && <p className="max-w-sm text-sm text-danger">{error}</p>}
-      {projectId && <p className="text-xs text-ink/40">proje: {projectId}</p>}
+      {error && <p className="max-w-sm text-sm text-absent">{error}</p>}
+      {projectId && <p className="text-xs text-ink-3">proje: {projectId}</p>}
     </div>
   )
 }
