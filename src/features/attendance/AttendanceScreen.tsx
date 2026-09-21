@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDataSource } from '../../app/dataSource'
 import { useSelection } from '../../app/selection'
@@ -6,7 +6,7 @@ import type { AttendanceStatus } from '../../domain/types'
 import { useGroupOptions } from './useGroupOptions'
 import { AttendanceRow } from './AttendanceRow'
 import { GroupSheet } from './GroupSheet'
-import { dayLabel, shiftDay } from './date'
+import { dayLabel, shiftDay, shortDate } from './date'
 import { isDirty, marksFromRows, STATUSES, STATUS_LABEL, summarize, type Marks } from './summary'
 
 const SEGMENT: Record<AttendanceStatus, string> = {
@@ -31,6 +31,7 @@ export function AttendanceScreen() {
   const [marks, setMarks] = useState<Marks>({})
   const [sheetOpen, setSheetOpen] = useState(false)
   const [toast, setToast] = useState<Toast | null>(null)
+  const dateInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!groupId && groups.data?.length) setGroupId(groups.data[0].id)
@@ -149,16 +150,22 @@ export function AttendanceScreen() {
         >
           ◀
         </button>
-        <label className="flex min-w-0 flex-1 flex-col items-center">
-          <span className="font-display text-sm font-semibold">{dayLabel(date)}</span>
-          <input
-            type="date"
-            aria-label="Tarih"
-            value={date}
-            onChange={(event) => setDate(event.target.value)}
-            className="bg-transparent text-sm text-ink-2"
-          />
-        </label>
+        <button
+          type="button"
+          onClick={() => dateInput.current?.showPicker?.()}
+          className="flex min-w-0 flex-1 flex-col items-center leading-tight"
+        >
+          <span className="font-display text-base font-semibold">{dayLabel(date)}</span>
+          <span className="text-xs text-ink-2">{shortDate(date)}</span>
+        </button>
+        <input
+          ref={dateInput}
+          type="date"
+          aria-label="Tarih"
+          value={date}
+          onChange={(event) => event.target.value && setDate(event.target.value)}
+          className="sr-only"
+        />
         <button
           type="button"
           aria-label="Sonraki gün"
@@ -255,7 +262,7 @@ export function AttendanceScreen() {
 
       {/* 7-8. Tek toast yeri */}
       {toast && (
-        <div className="fixed inset-x-0 bottom-[calc(128px+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-3xl justify-center px-4">
+        <div className="fixed inset-x-0 bottom-[calc(148px+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-3xl justify-center px-4">
           <div className="flex items-center gap-3 rounded-full bg-present px-4 py-2 text-sm font-medium text-bg">
             <span>{toast.text}</span>
             {toast.undo && (

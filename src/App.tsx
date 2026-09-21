@@ -36,8 +36,8 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
     <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col">
       <header className="sticky top-0 z-10 border-b border-line bg-bg/85 px-4 py-3 backdrop-blur">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-baseline gap-2">
-            <h1 className="font-display text-lg font-semibold tracking-tight">
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="min-w-0 truncate font-display text-base font-semibold tracking-tight">
               {club.data?.primaryName ?? 'SportFlow'}
               {club.data?.secondaryName && (
                 <span className="ml-1 font-normal text-ink-2">{club.data.secondaryName}</span>

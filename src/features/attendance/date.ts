@@ -18,3 +18,7 @@ export function dayLabel(iso: string, today: string = todayIso()): string {
     month: 'long',
   })
 }
+
+/** "21 Eyl" — başlık altı kısa tarih. */
+export const shortDate = (iso: string) =>
+  new Date(`${iso}T12:00:00`).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })
