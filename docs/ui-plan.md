@@ -1,6 +1,11 @@
 # SportFlow — Arayüz yenileme planı
 
-**Durum:** hazırlık bitti, uygulama sıradaki oturumda.
+**Durum (2026-09-21):** P0 ve P1 tamamlandı (`feature/ui-p0-p1`), yayın **https://anadoluspor-yoklama.web.app**
+(canlı okuma, `VITE_FIRESTORE_WRITES=off`). `sportflow` site adı Firebase'de başka projeye ayrılıydı.
+Araç kararından sapma: shadcn/lucide **eklenmedi** — sheet yerel `<dialog>`, ikonlar inline SVG, yeni bağımlılık sıfır.
+AA kontrast `src/app/theme.test.ts` ile kilitli; plandaki `late #B45309` soft zemininde 4.5 altı çıktı → `#92400E`.
+Google girişi için `anadoluspor-yoklama.web.app` Authentication > Authorized domains'e **eklenmeli** (Console, elle).
+Sırada: P2 (14 kaydedilmemiş değişiklik koruması öncelikli), sonra yazmayı açma kararı.
 **Teşhis:** Bu bir saha aracı değil, mobil genişliğe sıkıştırılmış bir CRUD paneli.
 Tüm ekran üç primitiften kurulu (`rounded-2xl bg-white p-4 shadow-sm` + gri `text-sm`
 etiket + yeşil buton); asıl iş olan "10 kişiye hızla durum ver" eylemi ekranın ortasında
