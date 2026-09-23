@@ -47,7 +47,7 @@ export interface Player {
   lastName: string
   birthDate?: string
   gender?: Gender
-  groupId: Id
+  /** Kulüp geneli durum: hiç açık dönemi kalmayan sporcu pasiftir. */
   status: PlayerStatus
   guardianName?: string
   guardianPhone?: string

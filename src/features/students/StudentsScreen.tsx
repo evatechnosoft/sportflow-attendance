@@ -8,7 +8,7 @@ import type { Id, Player } from '../../domain/types'
 import { GroupSheet } from '../attendance/GroupSheet'
 import { useGroupOptions } from '../attendance/useGroupOptions'
 import { todayIso } from '../attendance/date'
-import { ageOn, changeGroup, leaveGroup, rejoinGroup, startSpell } from './membership'
+import { ageOn, changeGroup, isInGroup, joinGroup, leaveGroup, startSpell } from './membership'
 
 /** Onay bekleyen eylem: grup değişimi hedefiyle, ayrılma sporcusuyla. */
 type Pending =
@@ -41,13 +41,14 @@ export function StudentsScreen() {
     queryFn: () => db.players.listByGroup(groupId, { includeInactive: true }),
   })
 
+  // Ekran grup bağlamında çalışır: bu grupta açık dönemi olan üye, kapalısı ayrılmış.
   const { active, left } = useMemo(() => {
     const rows = players.data ?? []
     return {
-      active: rows.filter((row) => row.status === 'active'),
-      left: rows.filter((row) => row.status === 'inactive'),
+      active: rows.filter((row) => isInGroup(row, groupId)),
+      left: rows.filter((row) => !isInGroup(row, groupId)),
     }
-  }, [players.data])
+  }, [players.data, groupId])
 
   const refresh = () => {
     setError('')
@@ -61,7 +62,6 @@ export function StudentsScreen() {
     mutationFn: (input: { firstName: string; lastName: string; birthDate?: string }) =>
       db.players.create({
         ...input,
-        groupId,
         status: 'active',
         groupHistory: startSpell(groupId, todayIso()),
       }),
@@ -76,7 +76,6 @@ export function StudentsScreen() {
   const patch = useMutation({
     mutationFn: (next: Player) =>
       db.players.update(next.id, {
-        groupId: next.groupId,
         status: next.status,
         groupHistory: next.groupHistory,
       }),
@@ -95,8 +94,8 @@ export function StudentsScreen() {
     const on = todayIso()
     patch.mutate(
       pending.kind === 'move'
-        ? changeGroup(pending.player, pending.groupId, on)
-        : leaveGroup(pending.player, on),
+        ? changeGroup(pending.player, groupId, pending.groupId, on)
+        : leaveGroup(pending.player, groupId, on),
     )
   }
 
@@ -184,7 +183,7 @@ export function StudentsScreen() {
                 <button
                   type="button"
                   disabled={patch.isPending}
-                  onClick={() => patch.mutate(rejoinGroup(player, groupId, todayIso()))}
+                  onClick={() => patch.mutate(joinGroup(player, groupId, todayIso()))}
                   className="min-h-11 shrink-0 rounded-xl bg-brand px-4 text-sm font-medium text-bg disabled:opacity-40"
                 >
                   Geri al

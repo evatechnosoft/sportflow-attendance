@@ -65,6 +65,10 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
     }
   }
 
+  /** Sporcunun o gruptaki dönemleri — açık dönem üyelik, kapalı dönem geçmiştir. */
+  const spellsIn = (player: Player, groupId: Id) =>
+    player.groupHistory.filter((spell) => spell.groupId === groupId)
+
   const requireGroup = (id: Id) => {
     const group = groups.find((row) => row.id === id)
     if (!group) throw notFound('Grup', id)
@@ -144,7 +148,7 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
         return { ...row }
       },
       async remove(id) {
-        if (players.some((row) => row.groupId === id)) throw inUse('Grup', id)
+        if (players.some((row) => spellsIn(row, id).length > 0)) throw inUse('Grup', id)
         const index = groups.findIndex((row) => row.id === id)
         if (index < 0) throw notFound('Grup', id)
         groups.splice(index, 1)
@@ -154,15 +158,16 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
     players: {
       async listByGroup(groupId, options = {}) {
         return clone(
-          players.filter(
-            (row) =>
-              row.groupId === groupId &&
-              (options.includeInactive || row.status === 'active'),
-          ),
+          players.filter((row) => {
+            const spells = spellsIn(row, groupId)
+            return options.includeInactive
+              ? spells.length > 0
+              : spells.some((spell) => !spell.leftOn)
+          }),
         )
       },
       async create(input) {
-        requireGroup(input.groupId)
+        for (const spell of input.groupHistory) requireGroup(spell.groupId)
         const row: Player = { ...input, id: nextId('player') }
         players.push(row)
         return { ...row }
@@ -170,7 +175,7 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
       async update(id, patch) {
         const row = players.find((candidate) => candidate.id === id)
         if (!row) throw notFound('Oyuncu', id)
-        if (patch.groupId) requireGroup(patch.groupId)
+        for (const spell of patch.groupHistory ?? []) requireGroup(spell.groupId)
         Object.assign(row, patch)
         return { ...row }
       },
@@ -206,7 +211,8 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
 
         for (const mark of marks) {
           const player = players.find((row) => row.id === mark.playerId)
-          if (!player || player.groupId !== session.groupId) {
+          // Geçmiş yoklama düzeltilebilsin: kapanmış dönem de o gruba aitlik sayılır.
+          if (!player || spellsIn(player, session.groupId).length === 0) {
             throw notFound('Grubun oyuncusu', mark.playerId)
           }
         }

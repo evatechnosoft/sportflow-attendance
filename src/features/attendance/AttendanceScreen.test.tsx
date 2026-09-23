@@ -28,14 +28,12 @@ async function setup(schedule: ScheduleSlot[] = []) {
   await db.players.create({
     firstName: 'Can',
     lastName: 'Erdoğan',
-    groupId: group.id,
     status: 'active',
     groupHistory: spell,
   })
   await db.players.create({
     firstName: 'Ada',
     lastName: 'Yıldız',
-    groupId: group.id,
     status: 'active',
     groupHistory: spell,
   })

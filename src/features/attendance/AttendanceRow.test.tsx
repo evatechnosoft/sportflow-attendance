@@ -8,7 +8,6 @@ const player: Player = {
   id: 'p1',
   firstName: 'Ada',
   lastName: 'Yıldız',
-  groupId: 'g1',
   status: 'active',
   groupHistory: [{ groupId: 'g1', joinedOn: '2026-09-01' }],
 }

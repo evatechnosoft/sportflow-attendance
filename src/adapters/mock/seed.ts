@@ -33,6 +33,7 @@ const WEEKS_BACK = 4
 const SEASON_START = '2026-09-01'
 const PAST_SEASON = '2025-09-01'
 const LEFT_ON = '2026-09-15'
+const SECOND_GROUP_ON = '2026-09-10'
 
 /** Deterministik mock veri: aynı girdi → aynı çıktı, test ve demo tekrar edilebilir olsun. */
 export function buildSeed(today = new Date('2026-09-19')): MockSeed {
@@ -71,13 +72,16 @@ export function buildSeed(today = new Date('2026-09-19')): MockSeed {
       joinedOn: SEASON_START,
       ...(left ? { leftOn: LEFT_ON } : {}),
     })
+    // Her 11'de bir aktif sporcu ikinci bir grupta daha oynar (ör. maç kadrosu).
+    if (!left && index % 11 === 4) {
+      history.push({ groupId: groups[(index + 2) % groups.length].id, joinedOn: SECOND_GROUP_ON })
+    }
     return {
       id: `player-${index + 1}`,
       firstName: row.PlayerName,
       lastName: row.PlayerLastName,
       birthDate: row.PlayerBirthDate,
       gender: row.PlayerGender === 'female' ? 'female' : 'male',
-      groupId,
       status: left ? ('inactive' as const) : ('active' as const),
       guardianName: row.ParentName,
       guardianPhone: row.Phone,
@@ -100,7 +104,9 @@ export function buildSeed(today = new Date('2026-09-19')): MockSeed {
       sessions.push(session)
 
       players
-        .filter((player) => player.groupId === group.id && player.status === 'active')
+        .filter((player) =>
+          player.groupHistory.some((spell) => spell.groupId === group.id && !spell.leftOn),
+        )
         .forEach((player, index) => {
           const roll = (index + week) % 7
           attendance.push({

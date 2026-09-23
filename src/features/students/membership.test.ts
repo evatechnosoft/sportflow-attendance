@@ -1,57 +1,90 @@
 import { describe, expect, it } from 'vitest'
 import type { Player } from '../../domain/types'
-import { ageOn, changeGroup, currentSpell, leaveGroup, rejoinGroup, startSpell } from './membership'
+import {
+  ageOn,
+  changeGroup,
+  isInGroup,
+  joinGroup,
+  leaveGroup,
+  openSpells,
+  startSpell,
+} from './membership'
 
 const player = (overrides: Partial<Player> = {}): Player => ({
   id: 'p1',
   firstName: 'Ada',
   lastName: 'Yıldız',
-  groupId: 'g1',
   status: 'active',
   groupHistory: [{ groupId: 'g1', joinedOn: '2026-09-01' }],
   ...overrides,
 })
+
+/** İki açık dönemli sporcu: normal grubu + maç kadrosu. */
+const inTwoGroups = () => joinGroup(player(), 'g2', '2026-09-23')
 
 describe('üyelik dönemleri', () => {
   it('yeni sporcu tek açık dönemle başlar', () => {
     expect(startSpell('g1', '2026-09-23')).toEqual([{ groupId: 'g1', joinedOn: '2026-09-23' }])
   })
 
-  it('grup değişimi açık dönemi kapatır ve yenisini açar', () => {
-    const moved = changeGroup(player(), 'g2', '2026-09-23')
-    expect(moved.groupId).toBe('g2')
-    expect(moved.groupHistory).toEqual([
+  it('ikinci gruba eklenen sporcu iki grupta birden görünür', () => {
+    const both = inTwoGroups()
+    expect(openSpells(both)).toHaveLength(2)
+    expect(isInGroup(both, 'g1')).toBe(true)
+    expect(isInGroup(both, 'g2')).toBe(true)
+  })
+
+  it('zaten üye olduğu gruba ekleme hiçbir şey değiştirmez', () => {
+    const before = player()
+    expect(joinGroup(before, 'g1', '2026-09-23')).toEqual(before)
+  })
+
+  it('gruptan çıkarma yalnız o dönemi kapatır, diğer üyelik durur', () => {
+    const left = leaveGroup(inTwoGroups(), 'g1', '2026-09-30')
+    expect(left.status).toBe('active')
+    expect(isInGroup(left, 'g1')).toBe(false)
+    expect(isInGroup(left, 'g2')).toBe(true)
+    expect(left.groupHistory).toHaveLength(2)
+  })
+
+  it('son açık dönem de kapanınca sporcu pasife düşer', () => {
+    const out = leaveGroup(leaveGroup(inTwoGroups(), 'g1', '2026-09-30'), 'g2', '2026-10-01')
+    expect(out.status).toBe('inactive')
+    expect(openSpells(out)).toHaveLength(0)
+  })
+
+  it('üye olmadığı gruptan çıkarma hiçbir şey değiştirmez', () => {
+    const before = player()
+    expect(leaveGroup(before, 'g9', '2026-09-30')).toEqual(before)
+  })
+
+  it('geri dönüş yeni dönem açar, eski dönem geri açılmaz', () => {
+    const back = joinGroup(leaveGroup(player(), 'g1', '2026-09-23'), 'g1', '2026-10-01')
+    expect(back.status).toBe('active')
+    expect(back.groupHistory).toEqual([
       { groupId: 'g1', joinedOn: '2026-09-01', leftOn: '2026-09-23' },
-      { groupId: 'g2', joinedOn: '2026-09-23' },
+      { groupId: 'g1', joinedOn: '2026-10-01' },
     ])
   })
 
-  it('aynı gruba taşıma hiçbir şey değiştirmez', () => {
-    const before = player()
-    expect(changeGroup(before, 'g1', '2026-09-23')).toEqual(before)
+  it('grup değişimi yalnız kaynağı kapatır, diğer gruplar durur', () => {
+    const moved = changeGroup(inTwoGroups(), 'g1', 'g3', '2026-09-30')
+    expect(isInGroup(moved, 'g1')).toBe(false)
+    expect(isInGroup(moved, 'g2')).toBe(true)
+    expect(isInGroup(moved, 'g3')).toBe(true)
+    expect(moved.groupHistory.find((spell) => spell.groupId === 'g1')?.leftOn).toBe('2026-09-30')
   })
 
-  it('ayrılma açık dönemi kapatır ve durumu pasife çeker', () => {
-    const left = leaveGroup(player(), '2026-09-23')
-    expect(left.status).toBe('inactive')
-    expect(left.groupHistory.at(-1)).toEqual({
-      groupId: 'g1',
-      joinedOn: '2026-09-01',
-      leftOn: '2026-09-23',
-    })
+  it('hedefine zaten üye olan sporcu taşınınca kaynak yine kapanır', () => {
+    const moved = changeGroup(inTwoGroups(), 'g1', 'g2', '2026-09-30')
+    expect(isInGroup(moved, 'g1')).toBe(false)
+    expect(openSpells(moved)).toHaveLength(1)
   })
 
-  it('geri dönüş eski dönemi açmaz, yeni dönem açar', () => {
-    const back = rejoinGroup(leaveGroup(player(), '2026-09-23'), 'g2', '2026-10-01')
-    expect(back.status).toBe('active')
-    expect(back.groupId).toBe('g2')
-    expect(back.groupHistory).toHaveLength(2)
-    expect(back.groupHistory.at(-1)).toEqual({ groupId: 'g2', joinedOn: '2026-10-01' })
-  })
-
-  it('currentSpell yalnız açık dönemi döner', () => {
-    expect(currentSpell(player())?.groupId).toBe('g1')
-    expect(currentSpell(leaveGroup(player(), '2026-09-23'))).toBeNull()
+  it('kapanmış dönemler silinmez', () => {
+    const out = leaveGroup(player(), 'g1', '2026-09-23')
+    expect(out.groupHistory).toHaveLength(1)
+    expect(out.groupHistory[0].leftOn).toBe('2026-09-23')
   })
 
   it('yaş doğum gününden önce bir eksiktir', () => {

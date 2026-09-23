@@ -32,7 +32,6 @@ export function runDataSourceContract(name: string, makeDataSource: () => DataSo
       db.players.create({
         firstName,
         lastName: 'Erdoğan',
-        groupId,
         status: 'active',
         groupHistory: [{ groupId, joinedOn: '2026-09-01' }],
       })
@@ -141,7 +140,6 @@ export function runDataSourceContract(name: string, makeDataSource: () => DataSo
           db.players.create({
             firstName: 'Ada',
             lastName: 'Yıldız',
-            groupId: 'yok',
             status: 'active',
             groupHistory: [{ groupId: 'yok', joinedOn: '2026-09-01' }],
           }),
@@ -151,7 +149,10 @@ export function runDataSourceContract(name: string, makeDataSource: () => DataSo
       it('pasif oyuncu varsayılan listede çıkmaz, includeInactive ile çıkar', async () => {
         const group = await seedGroup()
         const player = await seedPlayer(group.id)
-        await db.players.update(player.id, { status: 'inactive' })
+        await db.players.update(player.id, {
+          status: 'inactive',
+          groupHistory: [{ groupId: group.id, joinedOn: '2026-09-01', leftOn: '2026-09-23' }],
+        })
         expect(await db.players.listByGroup(group.id)).toHaveLength(0)
         expect(await db.players.listByGroup(group.id, { includeInactive: true })).toHaveLength(1)
       })
@@ -174,7 +175,6 @@ export function runDataSourceContract(name: string, makeDataSource: () => DataSo
         })
         const player = await seedPlayer(group.id)
         await db.players.update(player.id, {
-          groupId: other.id,
           groupHistory: [
             { groupId: group.id, joinedOn: '2026-09-01', leftOn: '2026-09-23' },
             { groupId: other.id, joinedOn: '2026-09-23' },
@@ -182,6 +182,36 @@ export function runDataSourceContract(name: string, makeDataSource: () => DataSo
         })
         expect(await db.players.listByGroup(group.id)).toHaveLength(0)
         expect(await db.players.listByGroup(other.id)).toHaveLength(1)
+      })
+
+      it('aynı sporcu iki grupta birden listelenir', async () => {
+        const group = await seedGroup()
+        const squad = await db.groups.create({
+          name: 'U12 Maç Kadrosu',
+          schoolId: group.schoolId,
+          branchId: group.branchId,
+          schedule: [],
+        })
+        const player = await seedPlayer(group.id)
+        await db.players.update(player.id, {
+          groupHistory: [
+            { groupId: group.id, joinedOn: '2026-09-01' },
+            { groupId: squad.id, joinedOn: '2026-09-23' },
+          ],
+        })
+        expect(await db.players.listByGroup(group.id)).toHaveLength(1)
+        expect(await db.players.listByGroup(squad.id)).toHaveLength(1)
+      })
+
+      it('kapanmış dönem yalnız includeInactive ile görünür', async () => {
+        const group = await seedGroup()
+        const player = await seedPlayer(group.id)
+        await db.players.update(player.id, {
+          status: 'inactive',
+          groupHistory: [{ groupId: group.id, joinedOn: '2026-09-01', leftOn: '2026-09-23' }],
+        })
+        expect(await db.players.listByGroup(group.id)).toHaveLength(0)
+        expect(await db.players.listByGroup(group.id, { includeInactive: true })).toHaveLength(1)
       })
 
       it('olmayan sporcu güncellenemez', async () => {

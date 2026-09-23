@@ -53,7 +53,6 @@ export function toPlayer(id: string, raw: FirestoreAthlete): Player {
     firstName: parts.slice(0, -1).join(' ') || parts[0] || '(isimsiz)',
     lastName: parts.length > 1 ? parts[parts.length - 1] : '',
     birthDate: raw.birthYear ? `${raw.birthYear}-01-01` : undefined,
-    groupId: raw.groupId ?? '',
     status: raw.status === 'approved' ? 'active' : 'inactive',
     guardianName: raw.parentName,
     guardianPhone: raw.parentPhone,

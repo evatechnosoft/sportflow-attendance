@@ -11,9 +11,20 @@ describe('buildSeed', () => {
     expect(seed.groups?.length).toBeGreaterThan(3)
   })
 
-  it('her oyuncu var olan bir gruba bağlıdır', () => {
+  it('her dönem var olan bir gruba bağlıdır', () => {
     const groupIds = new Set(seed.groups?.map((group) => group.id))
-    expect(seed.players?.every((player) => groupIds.has(player.groupId))).toBe(true)
+    expect(
+      seed.players?.every((player) =>
+        player.groupHistory.every((spell) => groupIds.has(spell.groupId)),
+      ),
+    ).toBe(true)
+  })
+
+  it('en az bir sporcu aynı anda iki gruptadır', () => {
+    const multi = seed.players?.filter(
+      (player) => player.groupHistory.filter((spell) => !spell.leftOn).length > 1,
+    )
+    expect(multi?.length).toBeGreaterThan(0)
   })
 
   it('geçmiş oturumların yoklaması yalnız aktif oyuncular için yazılır', () => {

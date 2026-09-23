@@ -28,21 +28,18 @@ async function setup() {
     firstName: 'Ada',
     lastName: 'Yıldız',
     birthDate: '2013-05-04',
-    groupId: group.id,
     status: 'active',
     groupHistory: [{ groupId: group.id, joinedOn: '2026-09-01' }],
   })
   await db.players.create({
     firstName: 'Can',
     lastName: 'Erdoğan',
-    groupId: group.id,
     status: 'active',
     groupHistory: [{ groupId: group.id, joinedOn: '2026-09-01' }],
   })
   await db.players.create({
     firstName: 'Deniz',
     lastName: 'Ak',
-    groupId: group.id,
     status: 'inactive',
     groupHistory: [{ groupId: group.id, joinedOn: '2026-09-01', leftOn: '2026-09-15' }],
   })
@@ -107,8 +104,11 @@ describe('StudentsScreen', () => {
     await user.click(screen.getByRole('button', { name: /Voleybol U14/ }))
     await user.click(screen.getByRole('button', { name: 'Taşı' }))
 
-    await waitFor(() => expect(screen.queryByText('Ada Yıldız')).toBeNull())
-    expect(await db.players.listByGroup(group.id)).toHaveLength(1)
+    // Taşınan sporcu bu grubun aktif listesinden düşer, geçmişi Ayrılanlar'da durur.
+    await screen.findByText(/Ayrılanlar \(2\)/)
+    await waitFor(async () =>
+      expect(await db.players.listByGroup(group.id)).toHaveLength(1),
+    )
     const moved = (await db.players.listByGroup(other.id))[0]
     expect(moved.groupHistory).toHaveLength(2)
     expect(moved.groupHistory.at(-1)?.leftOn).toBeUndefined()
@@ -120,7 +120,6 @@ describe('StudentsScreen', () => {
     await db.players.create({
       firstName: 'Zeynep',
       lastName: 'Kaya',
-      groupId: other.id,
       status: 'active',
       groupHistory: [{ groupId: other.id, joinedOn: '2026-09-01' }],
     })
