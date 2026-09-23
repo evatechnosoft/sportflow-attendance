@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { AttendanceScreen } from './features/attendance/AttendanceScreen'
 import { HistoryScreen } from './features/attendance/HistoryScreen'
 import { ManageScreen } from './features/manage/ManageScreen'
+import { StudentsScreen } from './features/students/StudentsScreen'
 import { LoginScreen } from './features/auth/LoginScreen'
 import { useFirebaseAuth } from './app/auth'
 import type { DataSourceHandle } from './app/createDataSource'
@@ -13,6 +14,7 @@ import { THEME_LABEL, useTheme, type ThemeMode } from './app/theme'
 const TABS = [
   { id: 'attendance', label: 'Yoklama' },
   { id: 'history', label: 'Geçmiş' },
+  { id: 'students', label: 'Sporcular' },
   { id: 'manage', label: 'Tanımlar' },
 ] as const
 
@@ -82,6 +84,8 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
           <AttendanceScreen />
         ) : tab === 'history' ? (
           <HistoryScreen onPick={() => setTab('attendance')} />
+        ) : tab === 'students' ? (
+          <StudentsScreen />
         ) : (
           <ManageScreen />
         )}
@@ -133,6 +137,14 @@ function TabIcon({ id }: { id: TabId }) {
       <svg {...iconProps}>
         <rect x="3" y="3" width="18" height="18" rx="4" />
         <path d="m8 12 3 3 5-6" />
+      </svg>
+    )
+  }
+  if (id === 'students') {
+    return (
+      <svg {...iconProps}>
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M5 20a7 7 0 0 1 14 0" />
       </svg>
     )
   }

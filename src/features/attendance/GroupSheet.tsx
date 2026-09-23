@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useDialog } from '../../app/useDialog'
 import type { GroupOption } from './useGroupOptions'
 
-/** Grup seçimi için alttan açılan yerel <dialog>. jsdom'da showModal yok → guard'lı. */
+/** Grup seçimi için alttan açılan yerel <dialog>. */
 export function GroupSheet({
   open,
   groups,
@@ -15,14 +15,7 @@ export function GroupSheet({
   onSelect: (id: string) => void
   onClose: () => void
 }) {
-  const ref = useRef<HTMLDialogElement>(null)
-
-  useEffect(() => {
-    const dialog = ref.current
-    if (!dialog) return
-    if (open) dialog.showModal?.()
-    else dialog.close?.()
-  }, [open])
+  const ref = useDialog(open)
 
   return (
     <dialog ref={ref} className="sheet" onClose={onClose} onClick={onClose}>
