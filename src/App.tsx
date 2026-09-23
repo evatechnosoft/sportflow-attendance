@@ -220,7 +220,7 @@ function ThemeIcon({ mode }: { mode: ThemeMode }) {
 function SourceBadge({ handle }: { handle: DataSourceHandle }) {
   if (handle.kind === 'mock') {
     return (
-      <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-2">
+      <span className="shrink-0 rounded-full border border-on-header-2 px-2 py-0.5 text-[11px] font-medium text-on-header">
         demo veri
       </span>
     )
