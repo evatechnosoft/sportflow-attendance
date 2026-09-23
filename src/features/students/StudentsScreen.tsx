@@ -8,11 +8,19 @@ import type { Id, Player } from '../../domain/types'
 import { GroupSheet } from '../attendance/GroupSheet'
 import { useGroupOptions } from '../attendance/useGroupOptions'
 import { todayIso } from '../attendance/date'
-import { ageOn, changeGroup, isInGroup, joinGroup, leaveGroup, startSpell } from './membership'
+import {
+  ageOn,
+  changeGroup,
+  isInGroup,
+  joinGroup,
+  leaveGroup,
+  openSpells,
+  startSpell,
+} from './membership'
 
-/** Onay bekleyen eylem: grup değişimi hedefiyle, ayrılma sporcusuyla. */
+/** Onay bekleyen eylem: hedef grubuyla taşıma/ekleme, ya da bu gruptan çıkarma. */
 type Pending =
-  | { kind: 'move'; player: Player; groupId: Id; groupLabel: string }
+  | { kind: 'move' | 'join'; player: Player; groupId: Id; groupLabel: string }
   | { kind: 'leave'; player: Player }
 
 const fullName = (player: Player) => `${player.firstName} ${player.lastName}`
@@ -26,7 +34,7 @@ export function StudentsScreen() {
   const [error, setError] = useState('')
   const [adding, setAdding] = useState(false)
   const [menuFor, setMenuFor] = useState<Id | null>(null)
-  const [moveFor, setMoveFor] = useState<Player | null>(null)
+  const [pickFor, setPickFor] = useState<{ player: Player; kind: 'move' | 'join' } | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [pending, setPending] = useState<Pending | null>(null)
 
@@ -92,15 +100,17 @@ export function StudentsScreen() {
   const confirm = () => {
     if (!pending) return
     const on = todayIso()
-    patch.mutate(
-      pending.kind === 'move'
-        ? changeGroup(pending.player, groupId, pending.groupId, on)
-        : leaveGroup(pending.player, groupId, on),
-    )
+    if (pending.kind === 'move') {
+      patch.mutate(changeGroup(pending.player, groupId, pending.groupId, on))
+    } else if (pending.kind === 'join') {
+      patch.mutate(joinGroup(pending.player, pending.groupId, on))
+    } else {
+      patch.mutate(leaveGroup(pending.player, groupId, on))
+    }
   }
 
-  const startMove = (player: Player) => {
-    setMoveFor(player)
+  const startPick = (player: Player, kind: 'move' | 'join') => {
+    setPickFor({ player, kind })
     setSheetOpen(true)
   }
 
@@ -110,7 +120,7 @@ export function StudentsScreen() {
       <button
         type="button"
         onClick={() => {
-          setMoveFor(null)
+          setPickFor(null)
           setSheetOpen(true)
         }}
         disabled={!groups.data?.length}
@@ -154,7 +164,8 @@ export function StudentsScreen() {
             player={player}
             open={menuFor === player.id}
             onToggle={() => setMenuFor((prev) => (prev === player.id ? null : player.id))}
-            onMove={() => startMove(player)}
+            onMove={() => startPick(player, 'move')}
+            onJoin={() => startPick(player, 'join')}
             onLeave={() => setPending({ kind: 'leave', player })}
           />
         ))}
@@ -200,13 +211,21 @@ export function StudentsScreen() {
         groupId={groupId}
         onSelect={(id) => {
           const target = groups.data?.find((group) => group.id === id)
-          if (moveFor && target) {
-            setPending({ kind: 'move', player: moveFor, groupId: id, groupLabel: target.label })
+          if (pickFor && target) {
+            setPending({
+              kind: pickFor.kind,
+              player: pickFor.player,
+              groupId: id,
+              groupLabel: target.label,
+            })
           } else {
             setGroupId(id)
           }
         }}
-        onClose={() => setSheetOpen(false)}
+        onClose={() => {
+          setSheetOpen(false)
+          setPickFor(null)
+        }}
       />
 
       <ConfirmSheet
@@ -224,20 +243,30 @@ function StudentRow({
   open,
   onToggle,
   onMove,
+  onJoin,
   onLeave,
 }: {
   player: Player
   open: boolean
   onToggle: () => void
   onMove: () => void
+  onJoin: () => void
   onLeave: () => void
 }) {
   const age = ageOn(player.birthDate, todayIso())
+  const groupCount = openSpells(player).length
   return (
     <li className="overflow-hidden rounded-2xl border border-line bg-surface">
       <div className="flex min-h-[72px] items-center gap-3 px-4">
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium">{fullName(player)}</span>
+          <span className="block truncate font-medium">
+            {fullName(player)}
+            {groupCount > 1 && (
+              <span className="ml-2 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-2">
+                {`${groupCount} grup`}
+              </span>
+            )}
+          </span>
           {player.birthDate && (
             <span className="block text-xs text-ink-3">
               {player.birthDate.slice(0, 4)}
@@ -256,20 +285,27 @@ function StudentRow({
         </button>
       </div>
       {open && (
-        <div className="flex gap-1 border-t border-line p-1">
+        <div className="flex flex-wrap gap-1 border-t border-line p-1">
           <button
             type="button"
             onClick={onMove}
-            className="min-h-11 flex-1 rounded-xl bg-surface-2 text-sm font-medium text-ink-2"
+            className="min-h-11 flex-1 rounded-xl bg-surface-2 px-2 text-xs font-medium text-ink-2"
           >
             Grubu değiştir
           </button>
           <button
             type="button"
-            onClick={onLeave}
-            className="min-h-11 flex-1 rounded-xl bg-absent-soft text-sm font-medium text-absent"
+            onClick={onJoin}
+            className="min-h-11 flex-1 rounded-xl bg-surface-2 px-2 text-xs font-medium text-ink-2"
           >
-            Ayrıldı
+            Başka gruba ekle
+          </button>
+          <button
+            type="button"
+            onClick={onLeave}
+            className="min-h-11 flex-1 rounded-xl bg-absent-soft px-2 text-xs font-medium text-absent"
+          >
+            Gruptan çıkar
           </button>
         </div>
       )}
@@ -359,8 +395,11 @@ function ConfirmSheet({
       ? ''
       : pending.kind === 'move'
         ? `${fullName(pending.player)} → ${pending.groupLabel} grubuna taşınsın mı?`
-        : `${fullName(pending.player)} ayrıldı olarak işaretlensin mi? Geçmiş yoklamalarda görünmeye devam eder.`
-  const action = pending?.kind === 'move' ? 'Taşı' : 'Ayrıldı olarak işaretle'
+        : pending.kind === 'join'
+          ? `${fullName(pending.player)} ${pending.groupLabel} grubuna da eklensin mi? Mevcut grupları durur.`
+          : `${fullName(pending.player)} bu gruptan çıkarılsın mı? Geçmiş yoklamalarda görünmeye devam eder.`
+  const action =
+    pending?.kind === 'move' ? 'Taşı' : pending?.kind === 'join' ? 'Ekle' : 'Çıkar'
 
   return (
     <Sheet open={pending !== null} onClose={onClose}>

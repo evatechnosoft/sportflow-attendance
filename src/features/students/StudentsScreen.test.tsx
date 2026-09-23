@@ -132,13 +132,13 @@ describe('StudentsScreen', () => {
     expect(screen.queryByText('Ada Yıldız')).toBeNull()
   })
 
-  it('ayrıldı işaretlenince sporcu Ayrılanlar bölümüne geçer', async () => {
+  it('gruptan çıkarılınca sporcu Ayrılanlar bölümüne geçer', async () => {
     const user = userEvent.setup({ delay: null })
     const { db, group } = await setup()
 
     await screen.findByText('Ada Yıldız')
-    await act(user, 'Ada Yıldız', 'Ayrıldı')
-    await user.click(screen.getByRole('button', { name: 'Ayrıldı olarak işaretle' }))
+    await act(user, 'Ada Yıldız', 'Gruptan çıkar')
+    await user.click(screen.getByRole('button', { name: 'Çıkar' }))
 
     await screen.findByText(/Ayrılanlar \(2\)/)
     expect(await db.players.listByGroup(group.id)).toHaveLength(1)
@@ -147,5 +147,20 @@ describe('StudentsScreen', () => {
     )
     expect(left?.status).toBe('inactive')
     expect(left?.groupHistory.at(-1)?.leftOn).toBeTruthy()
+  })
+
+  it('başka gruba eklenen sporcu iki grupta da listelenir', async () => {
+    const user = userEvent.setup({ delay: null })
+    const { db, group, other } = await setup()
+
+    await screen.findByText('Ada Yıldız')
+    await act(user, 'Ada Yıldız', 'Başka gruba ekle')
+    await user.click(screen.getByRole('button', { name: /Voleybol U14/ }))
+    await user.click(screen.getByRole('button', { name: 'Ekle' }))
+
+    // Her iki grupta da üye; satırda çoklu grup göstergesi çıkar.
+    await screen.findByText('2 grup')
+    await waitFor(async () => expect(await db.players.listByGroup(other.id)).toHaveLength(1))
+    expect(await db.players.listByGroup(group.id)).toHaveLength(2)
   })
 })
