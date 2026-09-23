@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import {
   motion,
   useMotionValue,
@@ -10,6 +10,7 @@ import type { AttendanceStatus, Player } from '../../domain/types'
 import { STATUSES, STATUS_LABEL } from './summary'
 import { isDrag, resolveSwipe, SWIPE_THRESHOLD } from './swipe'
 import { initials } from './avatar'
+import { DuesBadge } from './DuesBadge'
 
 // Tailwind sınıfları statik olmak zorunda (JIT tarama) — bu yüzden tam ad tablosu.
 const STRIPE: Record<AttendanceStatus, string> = {
@@ -54,10 +55,13 @@ function XIcon() {
 export function AttendanceRow({
   player,
   status,
+  overdue = false,
   onChange,
 }: {
   player: Player
   status?: AttendanceStatus
+  /** Aidat gecikmiş — CRM'den salt okunur bilgi. */
+  overdue?: boolean
   onChange: (status: AttendanceStatus) => void
 }) {
   const [expanded, setExpanded] = useState(false)
@@ -88,6 +92,7 @@ export function AttendanceRow({
   }
 
   const fullName = `${player.firstName} ${player.lastName}`
+  const duesId = useId()
 
   return (
     <li className="relative select-none overflow-hidden rounded-2xl">
@@ -128,6 +133,7 @@ export function AttendanceRow({
           type="button"
           aria-expanded={expanded}
           aria-label={fullName}
+          aria-describedby={overdue ? duesId : undefined}
           onClick={() => {
             if (!dragged.current) setExpanded((prev) => !prev)
           }}
@@ -142,7 +148,10 @@ export function AttendanceRow({
             {initials(player)}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-semibold">{fullName}</span>
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-semibold">{fullName}</span>
+              {overdue && <DuesBadge id={duesId} />}
+            </span>
             {expanded && (
               <span className="mt-0.5 block truncate text-xs text-ink-2">
                 {player.guardianName ? `Veli: ${player.guardianName}` : 'Veli bilgisi yok'}

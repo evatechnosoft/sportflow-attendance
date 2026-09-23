@@ -119,7 +119,15 @@ export function buildSeed(today = new Date('2026-09-19')): MockSeed {
     }
   })
 
-  return { schools, branches, groups, players, sessions, attendance }
+  // Demo: ilk grubun 2. ve 5. aktif sporcusunun aidatı gecikmiş.
+  const overdue = players
+    .filter((player) =>
+      player.groupHistory.some((spell) => spell.groupId === groups[0].id && !spell.leftOn),
+    )
+    .filter((_, index) => index === 1 || index === 4)
+    .map((player) => player.id)
+
+  return { schools, branches, groups, players, sessions, attendance, overdue }
 }
 
 /** `weeksAgo` hafta önceki, verilen ISO haftagününe denk gelen tarih. */

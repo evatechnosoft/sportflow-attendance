@@ -121,3 +121,19 @@ describe('ManageScreen — A5 alanlar ve silme', () => {
     expect(await db.branches.list()).toHaveLength(1)
   })
 })
+
+describe('ManageScreen — A6 aidat anahtarı', () => {
+  afterEach(cleanup)
+
+  it('aidat işareti anahtarı kapatılır', async () => {
+    const user = userEvent.setup({ delay: null })
+    const { db } = await setup()
+
+    const toggle = await screen.findByRole('switch', { name: /Aidat işareti/ })
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    await user.click(toggle)
+
+    await waitFor(async () => expect((await db.settings.get()).fields.dues).toBe(false))
+    expect((await db.settings.get()).fields.school).toBe(true)
+  })
+})

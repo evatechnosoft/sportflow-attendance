@@ -16,6 +16,25 @@ describe('AttendanceRow', () => {
   // vitest globals kapalı → RTL otomatik temizlik kaydolmuyor.
   afterEach(cleanup)
 
+  it('aidatı gecikmiş sporcuda rozet çıkar, satırın erişilebilir adı değişmez', () => {
+    render(
+      <ul>
+        <AttendanceRow player={player} overdue onChange={vi.fn()} />
+      </ul>,
+    )
+    expect(screen.getByLabelText('Aidat gecikmiş').textContent).toBe('Aidat')
+    expect(screen.getByRole('button', { name: 'Ada Yıldız' })).toBeTruthy()
+  })
+
+  it('gecikme yoksa rozet yok', () => {
+    render(
+      <ul>
+        <AttendanceRow player={player} onChange={vi.fn()} />
+      </ul>,
+    )
+    expect(screen.queryByLabelText('Aidat gecikmiş')).toBeNull()
+  })
+
   it('durum butonları yalnız karta dokununca açılır', async () => {
     const user = userEvent.setup({ delay: null })
     render(

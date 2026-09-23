@@ -24,7 +24,7 @@ async function setup() {
     branchId: branch.id,
     schedule: [],
   })
-  await db.players.create({
+  const ada = await db.players.create({
     firstName: 'Ada',
     lastName: 'Yıldız',
     birthDate: '2013-05-04',
@@ -43,6 +43,8 @@ async function setup() {
     status: 'inactive',
     groupHistory: [{ groupId: group.id, joinedOn: '2026-09-01', leftOn: '2026-09-15' }],
   })
+
+  db.dues.overdueByGroup = async () => [ada.id]
 
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
@@ -162,5 +164,15 @@ describe('StudentsScreen', () => {
     await screen.findByText('2 grup')
     await waitFor(async () => expect(await db.players.listByGroup(other.id)).toHaveLength(1))
     expect(await db.players.listByGroup(group.id)).toHaveLength(2)
+  })
+})
+
+describe('StudentsScreen — aidat', () => {
+  afterEach(cleanup)
+
+  it('aidatı gecikmiş sporcuda rozet görünür', async () => {
+    await setup()
+    const badge = await screen.findByLabelText('Aidat gecikmiş')
+    expect(badge.closest('li')?.textContent).toContain('Ada Yıldız')
   })
 })

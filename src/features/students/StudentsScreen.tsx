@@ -9,6 +9,8 @@ import { GroupSheet } from '../attendance/GroupSheet'
 import { joinParts, useGroupOptions } from '../attendance/useGroupOptions'
 import { todayIso } from '../attendance/date'
 import { avatarTone, initials } from '../attendance/avatar'
+import { DuesBadge } from '../attendance/DuesBadge'
+import { useOverdue } from '../attendance/useOverdue'
 import {
   ageOn,
   changeGroup,
@@ -32,6 +34,7 @@ export function StudentsScreen() {
   const groups = useGroupOptions()
   const { groupId, setGroupId } = useSelection()
 
+  const overdue = useOverdue(groupId)
   const [error, setError] = useState('')
   const [adding, setAdding] = useState(false)
   const [menuFor, setMenuFor] = useState<Id | null>(null)
@@ -163,6 +166,7 @@ export function StudentsScreen() {
           <StudentRow
             key={player.id}
             player={player}
+            overdue={overdue.has(player.id)}
             open={menuFor === player.id}
             onToggle={() => setMenuFor((prev) => (prev === player.id ? null : player.id))}
             onMove={() => startPick(player, 'move')}
@@ -246,8 +250,10 @@ function StudentRow({
   onMove,
   onJoin,
   onLeave,
+  overdue,
 }: {
   player: Player
+  overdue: boolean
   open: boolean
   onToggle: () => void
   onMove: () => void
@@ -266,13 +272,16 @@ function StudentRow({
           {initials(player)}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-semibold">
-            {fullName(player)}
-            {groupCount > 1 && (
-              <span className="ml-2 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-2">
-                {`${groupCount} grup`}
-              </span>
-            )}
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate font-semibold">
+              {fullName(player)}
+              {groupCount > 1 && (
+                <span className="ml-2 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-2">
+                  {`${groupCount} grup`}
+                </span>
+              )}
+            </span>
+            {overdue && <DuesBadge />}
           </span>
           {player.birthDate && (
             <span className="block text-xs text-ink-2">

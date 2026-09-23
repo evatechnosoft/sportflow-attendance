@@ -5,6 +5,7 @@ import { useSelection } from '../../app/selection'
 import type { AttendanceStatus } from '../../domain/types'
 import { joinParts, useGroupOptions } from './useGroupOptions'
 import { AttendanceRow } from './AttendanceRow'
+import { useOverdue } from './useOverdue'
 import { GroupSheet } from './GroupSheet'
 import { dayLabel, shiftDay, shortDate, weekdayOf, WEEKDAY_LABEL } from './date'
 import { hasSlotOn } from '../manage/schedule'
@@ -48,6 +49,7 @@ export function AttendanceScreen() {
   const groups = useGroupOptions()
   const { groupId, date, setGroupId, setDate } = useSelection()
 
+  const overdue = useOverdue(groupId)
   const [marks, setMarks] = useState<Marks>({})
   const [sheetOpen, setSheetOpen] = useState(false)
   const [toast, setToast] = useState<Toast | null>(null)
@@ -305,6 +307,7 @@ export function AttendanceScreen() {
             key={player.id}
             player={player}
             status={marks[player.id]}
+            overdue={overdue.has(player.id)}
             onChange={(status) =>
               handleChange(player.id, `${player.firstName} ${player.lastName}`, status)
             }

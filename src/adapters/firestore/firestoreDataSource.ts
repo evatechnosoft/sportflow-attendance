@@ -155,6 +155,14 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
       },
     },
 
+    dues: {
+      // CRM'in crm_installments koleksiyonunu okumak Google girişi ve yeni kural
+      // gerektiriyor (Faz 4). O zamana kadar sessizce boş: rozet çıkmaz, hata da yok.
+      async overdueByGroup() {
+        return []
+      },
+    },
+
     attendance: {
       async listBySession(sessionId) {
         const snapshot = await getDoc(doc(db, 'attendance', sessionId))

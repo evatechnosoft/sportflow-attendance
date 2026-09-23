@@ -76,6 +76,15 @@ export interface SettingsRepository {
   update(patch: { fields?: Partial<ClubSettings['fields']> }): Promise<ClubSettings>
 }
 
+/**
+ * CRM'in aidat verisine tek yönlü, salt okuma bakış. Yoklama asla yazmaz;
+ * yalnız "gecikmiş" bilgisi taşınır — tutar/detay koçun işi değil.
+ */
+export interface DuesRepository {
+  /** Grubun aktif sporcularından gecikmiş taksiti olanların id'leri. */
+  overdueByGroup(groupId: Id): Promise<Id[]>
+}
+
 export interface DataSource {
   schools: SchoolRepository
   branches: BranchRepository
@@ -84,4 +93,5 @@ export interface DataSource {
   sessions: SessionRepository
   attendance: AttendanceRepository
   settings: SettingsRepository
+  dues: DuesRepository
 }

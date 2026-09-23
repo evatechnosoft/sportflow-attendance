@@ -909,3 +909,26 @@ Commit: `feat(takvim): oturum saati düzenleme — bu oturum / bundan sonra`.
 - Contract testleri `src/testing/dataSourceContract.ts` § A5 — her adapter geçmek zorunda.
 - Firestore: `settings.get` varsayılanı döner; `settings.update`, `schools.remove`,
   `branches.remove` → `read_only` (canlı şemada karşılığı yok, kural/deploy değişmedi).
+
+## Faz A6 — Aidat işareti
+
+> 2026-09-23 · Yoklama ile CRM ayrı ürün, ama koç yoklamada gecikmiş aidatı görmeli [Dean].
+
+### Karar [Dean, 2026-09-23]
+
+- **Tek yönlü, salt okuma:** yoklama CRM verisini yalnız okur, asla yazmaz.
+  Port: `dues.overdueByGroup(groupId): Promise<Id[]>` — grubun **aktif** sporcularından
+  gecikmiş taksiti olanlar.
+- **Yalnız "gecikmiş":** tutar, vade, taksit detayı gösterilmez. Yoklama satırında ve
+  Sporcular listesinde isim yanında "Aidat" rozeti (`aria-label="Aidat gecikmiş"`,
+  satırın erişilebilir adı değişmez, `aria-describedby` ile bağlanır).
+- **Alan anahtarı:** `OptionalField = 'school' | 'dues'`, aidat varsayılan açık.
+  Kapalıyken rozet hiçbir yerde görünmez ve aidat sorgusu **atılmaz**.
+
+### Kurallar
+
+- Rozet tonu `--dues` / `--dues-soft`, durum renklerinden ayrı; AA `theme.test.ts`'te.
+- Mock: seed ilk grubun iki aktif sporcusunu gecikmiş işaretler.
+- Firestore: şimdilik **sessizce boş liste** (hata yok). `crm_installments` okuması Google
+  girişi ve yeni kural gerektiriyor — Faz 4.
+- Contract testleri `dataSourceContract.ts` § A6.

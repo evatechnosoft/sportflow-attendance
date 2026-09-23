@@ -53,6 +53,10 @@ describe.each([
     expect(contrast(t['on-header'], t.header)).toBeGreaterThanOrEqual(4.5)
     expect(contrast(t['on-header-2'], t.header)).toBeGreaterThanOrEqual(4.5)
   })
+  it('aidat rozeti: soft zeminde ve yüzeyde metin AA', () => {
+    expect(contrast(t.dues, t['dues-soft'])).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(t.dues, t.surface)).toBeGreaterThanOrEqual(4.5)
+  })
   it.each([1, 2, 3, 4, 5])('avatar %i metni kendi soft zemininde AA', (i) => {
     expect(contrast(t[`av-${i}`], t[`av-${i}-soft`])).toBeGreaterThanOrEqual(4.5)
   })

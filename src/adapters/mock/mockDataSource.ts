@@ -26,6 +26,8 @@ export interface MockSeed {
   players?: Player[]
   sessions?: Session[]
   attendance?: Attendance[]
+  /** Gecikmiş taksiti olan sporcu id'leri (CRM'in yerine). */
+  overdue?: Id[]
 }
 
 const clone = <T>(rows: T[]): T[] => rows.map((row) => ({ ...row }))
@@ -45,6 +47,7 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
   const players = clone(seed.players ?? [])
   const sessions = clone(seed.sessions ?? [])
   const attendance = clone(seed.attendance ?? [])
+  const overdue = new Set(seed.overdue ?? [])
   const clubIdentity = seed.clubIdentity ?? {
     primaryName: 'SPORTFLOW',
     secondaryName: 'DEMO KULÜBÜ',
@@ -220,6 +223,17 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
       async update(patch) {
         settings = { fields: { ...settings.fields, ...patch.fields } }
         return { fields: { ...settings.fields } }
+      },
+    },
+
+    dues: {
+      async overdueByGroup(groupId) {
+        return players
+          .filter(
+            (row) =>
+              overdue.has(row.id) && spellsIn(row, groupId).some((spell) => !spell.leftOn),
+          )
+          .map((row) => row.id)
       },
     },
 
