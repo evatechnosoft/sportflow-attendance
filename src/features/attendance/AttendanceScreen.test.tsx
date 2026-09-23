@@ -19,8 +19,21 @@ async function setup() {
     coachName: 'Elif Kaya',
     schedule: [],
   })
-  await db.players.create({ firstName: 'Can', lastName: 'Erdoğan', groupId: group.id, status: 'active' })
-  await db.players.create({ firstName: 'Ada', lastName: 'Yıldız', groupId: group.id, status: 'active' })
+  const spell = [{ groupId: group.id, joinedOn: '2026-09-01' }]
+  await db.players.create({
+    firstName: 'Can',
+    lastName: 'Erdoğan',
+    groupId: group.id,
+    status: 'active',
+    groupHistory: spell,
+  })
+  await db.players.create({
+    firstName: 'Ada',
+    lastName: 'Yıldız',
+    groupId: group.id,
+    status: 'active',
+    groupHistory: spell,
+  })
 
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(

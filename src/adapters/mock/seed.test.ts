@@ -23,6 +23,17 @@ describe('buildSeed', () => {
     expect(seed.attendance?.every((row) => activeIds.has(row.playerId))).toBe(true)
   })
 
+  it('demo veride ayrılmış sporcu ve iki dönemli sporcu bulunur', () => {
+    const players = seed.players!
+    expect(players.some((player) => player.status === 'inactive')).toBe(true)
+    expect(players.some((player) => player.groupHistory.length > 1)).toBe(true)
+    // Ayrılan sporcunun son dönemi kapalı, aktif sporcununki açık.
+    for (const player of players) {
+      const open = player.groupHistory.at(-1)!.leftOn === undefined
+      expect(open).toBe(player.status === 'active')
+    }
+  })
+
   it('oturum tarihleri grubun gününe denk gelir', () => {
     const group = seed.groups![0]
     const session = seed.sessions!.find((row) => row.groupId === group.id)!

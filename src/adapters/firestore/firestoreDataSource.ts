@@ -112,7 +112,7 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
       async create() {
         throw readOnly()
       },
-      async setStatus() {
+      async update() {
         throw readOnly()
       },
     },

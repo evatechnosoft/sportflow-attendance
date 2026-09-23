@@ -29,7 +29,13 @@ export function runDataSourceContract(name: string, makeDataSource: () => DataSo
     }
 
     const seedPlayer = async (groupId: Id, firstName = 'Can') =>
-      db.players.create({ firstName, lastName: 'Erdoğan', groupId, status: 'active' })
+      db.players.create({
+        firstName,
+        lastName: 'Erdoğan',
+        groupId,
+        status: 'active',
+        groupHistory: [{ groupId, joinedOn: '2026-09-01' }],
+      })
 
     describe('US-2 okul / branş / grup', () => {
       it('okul adı tekildir', async () => {
@@ -83,16 +89,56 @@ export function runDataSourceContract(name: string, makeDataSource: () => DataSo
     describe('US-3 oyuncu', () => {
       it('olmayan gruba oyuncu eklenemez', async () => {
         await expect(
-          db.players.create({ firstName: 'Ada', lastName: 'Yıldız', groupId: 'yok', status: 'active' }),
+          db.players.create({
+            firstName: 'Ada',
+            lastName: 'Yıldız',
+            groupId: 'yok',
+            status: 'active',
+            groupHistory: [{ groupId: 'yok', joinedOn: '2026-09-01' }],
+          }),
         ).rejects.toMatchObject({ code: 'not_found' })
       })
 
       it('pasif oyuncu varsayılan listede çıkmaz, includeInactive ile çıkar', async () => {
         const group = await seedGroup()
         const player = await seedPlayer(group.id)
-        await db.players.setStatus(player.id, 'inactive')
+        await db.players.update(player.id, { status: 'inactive' })
         expect(await db.players.listByGroup(group.id)).toHaveLength(0)
         expect(await db.players.listByGroup(group.id, { includeInactive: true })).toHaveLength(1)
+      })
+
+      it('yeni sporcu tek açık dönemle doğar', async () => {
+        const group = await seedGroup()
+        const player = await seedPlayer(group.id)
+        expect(player.groupHistory).toHaveLength(1)
+        expect(player.groupHistory[0]).toMatchObject({ groupId: group.id })
+        expect(player.groupHistory[0].leftOn).toBeUndefined()
+      })
+
+      it('grup değişimi yeni grubun listesinde görünür, eskisinde görünmez', async () => {
+        const group = await seedGroup()
+        const other = await db.groups.create({
+          name: 'Voleybol U14',
+          schoolId: group.schoolId,
+          branchId: group.branchId,
+          schedule: [],
+        })
+        const player = await seedPlayer(group.id)
+        await db.players.update(player.id, {
+          groupId: other.id,
+          groupHistory: [
+            { groupId: group.id, joinedOn: '2026-09-01', leftOn: '2026-09-23' },
+            { groupId: other.id, joinedOn: '2026-09-23' },
+          ],
+        })
+        expect(await db.players.listByGroup(group.id)).toHaveLength(0)
+        expect(await db.players.listByGroup(other.id)).toHaveLength(1)
+      })
+
+      it('olmayan sporcu güncellenemez', async () => {
+        await expect(db.players.update('yok', { status: 'inactive' })).rejects.toMatchObject({
+          code: 'not_found',
+        })
       })
     })
 

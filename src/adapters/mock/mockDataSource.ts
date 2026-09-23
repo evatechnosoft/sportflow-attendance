@@ -146,10 +146,11 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
         players.push(row)
         return { ...row }
       },
-      async setStatus(id, status) {
+      async update(id, patch) {
         const row = players.find((candidate) => candidate.id === id)
         if (!row) throw notFound('Oyuncu', id)
-        row.status = status
+        if (patch.groupId) requireGroup(patch.groupId)
+        Object.assign(row, patch)
         return { ...row }
       },
     },

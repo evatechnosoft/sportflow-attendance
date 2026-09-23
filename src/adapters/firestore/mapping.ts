@@ -57,6 +57,8 @@ export function toPlayer(id: string, raw: FirestoreAthlete): Player {
     status: raw.status === 'approved' ? 'active' : 'inactive',
     guardianName: raw.parentName,
     guardianPhone: raw.parentPhone,
+    // Eski şemada dönem geçmişi yok; okunan kayıt tek açık dönem sayılır.
+    groupHistory: [{ groupId: raw.groupId ?? '', joinedOn: '' }],
   }
 }
 

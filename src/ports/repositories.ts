@@ -37,7 +37,8 @@ export interface GroupRepository {
 export interface PlayerRepository {
   listByGroup(groupId: Id, options?: { includeInactive?: boolean }): Promise<Player[]>
   create(input: Omit<Player, 'id'>): Promise<Player>
-  setStatus(id: Id, status: Player['status']): Promise<Player>
+  /** Durum, grup ve dönem geçmişi tek kapıdan güncellenir. */
+  update(id: Id, patch: Partial<Omit<Player, 'id'>>): Promise<Player>
 }
 
 export interface SessionRepository {
