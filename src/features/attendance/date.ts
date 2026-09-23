@@ -7,6 +7,23 @@ export function shiftDay(iso: string, delta: number): string {
   return todayIso(day)
 }
 
+/** ISO-8601 haftagünü: 1 = Pazartesi … 7 = Pazar. */
+export function weekdayOf(iso: string): number {
+  // Öğlen saatiyle kur — gece yarısı UTC'ye çevrilince gün kayabilir.
+  const day = new Date(`${iso}T12:00:00`).getDay()
+  return day === 0 ? 7 : day
+}
+
+export const WEEKDAY_LABEL: Record<number, string> = {
+  1: 'Pazartesi',
+  2: 'Salı',
+  3: 'Çarşamba',
+  4: 'Perşembe',
+  5: 'Cuma',
+  6: 'Cumartesi',
+  7: 'Pazar',
+}
+
 /** "Bugün" / "Dün" / "Yarın", diğer günler "Cumartesi 20 Eylül". */
 export function dayLabel(iso: string, today: string = todayIso()): string {
   if (iso === today) return 'Bugün'
