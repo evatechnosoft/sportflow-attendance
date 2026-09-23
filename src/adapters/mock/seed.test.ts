@@ -20,6 +20,13 @@ describe('buildSeed', () => {
     ).toBe(true)
   })
 
+  it('demo için 1-2 aktif sporcunun aidatı gecikmiştir', () => {
+    const active = new Set(seed.players?.filter((p) => p.status === 'active').map((p) => p.id))
+    expect(seed.overdue?.length).toBeGreaterThanOrEqual(1)
+    expect(seed.overdue?.length).toBeLessThanOrEqual(2)
+    expect(seed.overdue?.every((id) => active.has(id))).toBe(true)
+  })
+
   it('en az bir sporcu aynı anda iki gruptadır', () => {
     const multi = seed.players?.filter(
       (player) => player.groupHistory.filter((spell) => !spell.leftOn).length > 1,

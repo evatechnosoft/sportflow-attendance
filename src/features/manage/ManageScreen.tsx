@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDataSource } from '../../app/dataSource'
 import { Sheet } from '../../app/Sheet'
 import { DomainError } from '../../domain/errors'
-import { DEFAULT_CLUB_SETTINGS, type Id, type ScheduleSlot } from '../../domain/types'
+import { DEFAULT_CLUB_SETTINGS, type Id, type OptionalField, type ScheduleSlot } from '../../domain/types'
 import { WEEKDAY_LABEL } from '../attendance/date'
 import { joinParts } from '../attendance/useGroupOptions'
 import { addSlot, hasSlotOn, removeSlot, scheduleLabel } from './schedule'
@@ -34,7 +34,8 @@ export function ManageScreen() {
   const branches = useQuery({ queryKey: ['branches'], queryFn: () => db.branches.list() })
   const groups = useQuery({ queryKey: ['groups'], queryFn: () => db.groups.list() })
   const settings = useQuery({ queryKey: ['club-settings'], queryFn: () => db.settings.get() })
-  const showSchool = (settings.data ?? DEFAULT_CLUB_SETTINGS).fields.school
+  const fields = (settings.data ?? DEFAULT_CLUB_SETTINGS).fields
+  const showSchool = fields.school
 
   const refresh = () => {
     setError('')
@@ -54,8 +55,9 @@ export function ManageScreen() {
     onSuccess: refresh,
     onError: fail,
   })
-  const toggleSchool = useMutation({
-    mutationFn: (school: boolean) => db.settings.update({ fields: { school } }),
+  const toggleField = useMutation({
+    mutationFn: ({ field, value }: { field: OptionalField; value: boolean }) =>
+      db.settings.update({ fields: { [field]: value } }),
     onSuccess: refresh,
     onError: fail,
   })
@@ -101,13 +103,22 @@ export function ManageScreen() {
       )}
 
       <Card title="Alanlar">
-        <FieldSwitch
-          label="Okul"
-          hint="Kapalıyken okul hiçbir ekranda görünmez; kayıtlar silinmez."
-          checked={showSchool}
-          busy={toggleSchool.isPending}
-          onChange={(value) => toggleSchool.mutate(value)}
-        />
+        <div className="divide-y divide-line">
+          <FieldSwitch
+            label="Okul"
+            hint="Kapalıyken okul hiçbir ekranda görünmez; kayıtlar silinmez."
+            checked={showSchool}
+            busy={toggleField.isPending}
+            onChange={(value) => toggleField.mutate({ field: 'school', value })}
+          />
+          <FieldSwitch
+            label="Aidat işareti"
+            hint="Yoklamada gecikmiş aidatı olan sporcuya rozet; tutar gösterilmez."
+            checked={fields.dues}
+            busy={toggleField.isPending}
+            onChange={(value) => toggleField.mutate({ field: 'dues', value })}
+          />
+        </div>
       </Card>
 
       {showSchool && (
@@ -219,7 +230,7 @@ function FieldSwitch({
       aria-checked={checked}
       disabled={busy}
       onClick={() => onChange(!checked)}
-      className="flex min-h-11 w-full items-center gap-3 text-left disabled:opacity-60"
+      className="flex min-h-11 w-full items-center gap-3 py-3 text-left first:pt-0 last:pb-0 disabled:opacity-60"
     >
       <span className="min-w-0 flex-1">
         <span className="block font-semibold">{label}</span>

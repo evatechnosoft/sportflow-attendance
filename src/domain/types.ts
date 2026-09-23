@@ -79,13 +79,13 @@ export interface ClubIdentity {
 }
 
 /** Kulübün açıp kapatabildiği alanlar; ileride genişler. */
-export type OptionalField = 'school'
+export type OptionalField = 'school' | 'dues'
 
 export interface ClubSettings {
   fields: Record<OptionalField, boolean>
 }
 
-export const DEFAULT_CLUB_SETTINGS: ClubSettings = { fields: { school: true } }
+export const DEFAULT_CLUB_SETTINGS: ClubSettings = { fields: { school: true, dues: true } }
 
 export interface SessionSummary {
   sessionId: Id

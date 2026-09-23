@@ -13,7 +13,13 @@ import { todayIso, weekdayOf, WEEKDAY_LABEL } from './date'
 /** Bugünün dışındaki bir ISO gün — takvimi olan ama bugün toplanmayan grup için. */
 const otherWeekday = () => (weekdayOf(todayIso()) % 7) + 1
 
-async function setup(schedule: ScheduleSlot[] = []) {
+/** Aidat: Can gecikmiş; `dues: false` alan anahtarını kapatır. Sorgu sayısı döner. */
+interface DuesOptions {
+  canOverdue?: boolean
+  dues?: boolean
+}
+
+async function setup(schedule: ScheduleSlot[] = [], dues: DuesOptions = {}) {
   const db: DataSource = createMockDataSource()
   const school = await db.schools.create({ name: 'Atatürk Ortaokulu' })
   const branch = await db.branches.create({ name: 'Voleybol', slug: 'voleybol' })
@@ -25,7 +31,7 @@ async function setup(schedule: ScheduleSlot[] = []) {
     schedule,
   })
   const spell = [{ groupId: group.id, joinedOn: '2026-09-01' }]
-  await db.players.create({
+  const can = await db.players.create({
     firstName: 'Can',
     lastName: 'Erdoğan',
     status: 'active',
@@ -37,6 +43,12 @@ async function setup(schedule: ScheduleSlot[] = []) {
     status: 'active',
     groupHistory: spell,
   })
+  const duesCalls = { count: 0 }
+  db.dues.overdueByGroup = async () => {
+    duesCalls.count += 1
+    return dues.canOverdue ? [can.id] : []
+  }
+  if (dues.dues === false) await db.settings.update({ fields: { dues: false } })
 
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   render(
@@ -48,7 +60,7 @@ async function setup(schedule: ScheduleSlot[] = []) {
       </DataSourceProvider>
     </QueryClientProvider>,
   )
-  return { db, group }
+  return { db, group, duesCalls }
 }
 
 /** Satırı aç, içindeki durum butonuna bas. */
@@ -61,6 +73,21 @@ async function mark(user: ReturnType<typeof userEvent.setup>, name: string, labe
 
 describe('AttendanceScreen', () => {
   afterEach(cleanup)
+
+  it('aidatı gecikmiş sporcunun satırında rozet çıkar, diğerinde çıkmaz', async () => {
+    await setup([], { canOverdue: true })
+    const badge = await screen.findByLabelText('Aidat gecikmiş')
+    expect(badge.closest('li')?.textContent).toContain('Can Erdoğan')
+    expect(screen.getAllByLabelText('Aidat gecikmiş')).toHaveLength(1)
+  })
+
+  it('aidat işareti kapalıyken rozet yok ve aidat sorgusu atılmaz', async () => {
+    const { duesCalls } = await setup([], { canOverdue: true, dues: false })
+    await screen.findByText('Can Erdoğan')
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(screen.queryByLabelText('Aidat gecikmiş')).toBeNull()
+    expect(duesCalls.count).toBe(0)
+  })
 
   it('okul alanı kapalıyken başlıkta okul adı ve ayırıcısı çıkmaz', async () => {
     const { db } = await setup()

@@ -289,9 +289,26 @@ export function runDataSourceContract(name: string, makeDataSource: () => DataSo
       })
     })
 
+    describe('A6 aidat işareti (yalnız okuma)', () => {
+      it('olmayan grup için boş liste döner, hata üretmez', async () => {
+        expect(await db.dues.overdueByGroup('yok')).toEqual([])
+      })
+
+      it('yalnız o grubun sporcularını döndürür', async () => {
+        const group = await seedGroup()
+        const player = await seedPlayer(group.id)
+        const overdue = await db.dues.overdueByGroup(group.id)
+        expect(overdue.every((id) => id === player.id)).toBe(true)
+      })
+    })
+
     describe('A5 alan anahtarı', () => {
       it('okul alanı varsayılan açıktır', async () => {
         expect((await db.settings.get()).fields.school).toBe(true)
+      })
+
+      it('aidat işareti varsayılan açıktır', async () => {
+        expect((await db.settings.get()).fields.dues).toBe(true)
       })
 
       it('okul alanı kapatılır ve kalıcıdır', async () => {

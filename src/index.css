@@ -36,6 +36,9 @@
   --av-4-soft: #fce4ef;
   --av-5: #0b6a84;
   --av-5-soft: #dcf0f6;
+  /* Aidat gecikmiş rozeti: durum renklerinden ayrı bir ton. */
+  --dues: #a21caf;
+  --dues-soft: #fae8ff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -72,6 +75,8 @@
     --av-4-soft: #3a1a2a;
     --av-5: #6fd0e6;
     --av-5-soft: #0f2e36;
+    --dues: #f0abfc;
+    --dues-soft: #3b1440;
   }
 }
 
@@ -108,6 +113,8 @@
   --av-4-soft: #3a1a2a;
   --av-5: #6fd0e6;
   --av-5-soft: #0f2e36;
+  --dues: #f0abfc;
+  --dues-soft: #3b1440;
 }
 
 @theme inline {
@@ -142,6 +149,8 @@
   --color-av-4-soft: var(--av-4-soft);
   --color-av-5: var(--av-5);
   --color-av-5-soft: var(--av-5-soft);
+  --color-dues: var(--dues);
+  --color-dues-soft: var(--dues-soft);
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Bricolage Grotesque', 'Inter', ui-sans-serif, system-ui, sans-serif;
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
