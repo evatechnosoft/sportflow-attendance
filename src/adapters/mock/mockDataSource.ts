@@ -1,8 +1,10 @@
-import { duplicate, inUse, invalid, notFound } from '../../domain/errors'
+import { DomainError, duplicate, invalid, inUse, notFound } from '../../domain/errors'
+import { DEFAULT_CLUB_SETTINGS } from '../../domain/types'
 import type {
   Attendance,
   AttendanceStatus,
   Branch,
+  ClubSettings,
   Group,
   Id,
   Player,
@@ -49,6 +51,8 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
     description: 'OKUL BAZLI YOKLAMA — ÖRNEK VERİ',
   }
 
+  let settings: ClubSettings = { fields: { ...DEFAULT_CLUB_SETTINGS.fields } }
+
   let counter = 0
   const nextId = (prefix: string) => `${prefix}-${++counter}`
 
@@ -89,10 +93,10 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
         return { ...row }
       },
       async remove(id) {
-        if (groups.some((row) => row.schoolId === id)) throw inUse('Okul', id)
         const index = schools.findIndex((row) => row.id === id)
         if (index < 0) throw notFound('Okul', id)
         schools.splice(index, 1)
+        for (const group of groups) if (group.schoolId === id) delete group.schoolId
       },
     },
 
@@ -112,7 +116,8 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
         return { ...row }
       },
       async remove(id) {
-        if (groups.some((row) => row.branchId === id)) throw inUse('Branş', id)
+        const users = groups.filter((row) => row.branchId === id).length
+        if (users > 0) throw new DomainError('in_use', `${users} grup bu branşı kullanıyor`)
         const index = branches.findIndex((row) => row.id === id)
         if (index < 0) throw notFound('Branş', id)
         branches.splice(index, 1)
@@ -130,7 +135,7 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
         )
       },
       async create(input) {
-        if (!schools.some((row) => row.id === input.schoolId)) {
+        if (input.schoolId && !schools.some((row) => row.id === input.schoolId)) {
           throw notFound('Okul', input.schoolId)
         }
         if (!branches.some((row) => row.id === input.branchId)) {
@@ -208,6 +213,13 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
     settings: {
       async clubIdentity() {
         return { ...clubIdentity }
+      },
+      async get() {
+        return { fields: { ...settings.fields } }
+      },
+      async update(patch) {
+        settings = { fields: { ...settings.fields, ...patch.fields } }
+        return { fields: { ...settings.fields } }
       },
     },
 

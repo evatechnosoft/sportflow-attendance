@@ -885,3 +885,27 @@ vermediği **bilinmiyor**. Faz B'de kural testiyle doğrulanacak.
 
 **Görev 12 — saat düzenleme.** Port + mock + contract + ekran, tek görevde.
 Commit: `feat(takvim): oturum saati düzenleme — bu oturum / bundan sonra`.
+
+## Faz A5 — Tanımlar: isteğe bağlı okul, alan anahtarı, silme
+
+> 2026-09-23 · Her kulüp okul bazlı çalışmıyor; tanımlar da yanlış girilince geri alınamıyordu [Dean].
+
+### Karar [Dean, 2026-09-23]
+
+- **Okul isteğe bağlı:** `Group.schoolId?: Id`. Grup formunda "Okul yok" seçilebilir.
+  Okulu olmayan grupta okul parçası ve " · " ayırıcısı **hiç** gösterilmez ("—" yok).
+  Firestore'da okul çözülemezse `schoolId` tanımsız kalır (sahte "atanmamış okul" yok).
+- **Alan anahtarı:** kulüp ayarı, veri kaynağından gelir (localStorage değil).
+  `settings.get() / settings.update(patch)`, `ClubSettings = { fields: Record<OptionalField, boolean> }`,
+  `OptionalField = 'school'` (şimdilik tek alan — YAGNI). Varsayılan: açık.
+  Kapalıyken Okullar kartı, grup formundaki okul seçimi ve tüm ekranlardaki okul adı gizlenir;
+  **veri silinmez**, açılınca geri gelir.
+- **Silme:** okul silinince onu kullanan grupların `schoolId`'si temizlenir, gruplar durur.
+  Branş grup tarafından kullanılıyorsa silinmez: `in_use` — "N grup bu branşı kullanıyor".
+  Tanımlar'da çip başına sil düğmesi (≥44px) + onay sayfası; hata sayfada görünür.
+
+### Kurallar
+
+- Contract testleri `src/testing/dataSourceContract.ts` § A5 — her adapter geçmek zorunda.
+- Firestore: `settings.get` varsayılanı döner; `settings.update`, `schools.remove`,
+  `branches.remove` → `read_only` (canlı şemada karşılığı yok, kural/deploy değişmedi).

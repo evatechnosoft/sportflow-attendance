@@ -44,6 +44,18 @@ describe.each([
   it('ikincil mürekkep yüzeyde AA', () => {
     expect(contrast(t['ink-2'], t.surface)).toBeGreaterThanOrEqual(4.5)
   })
+  it('vurgu: yüzeyde metin, dolguda bg metin, soft zeminde metin AA', () => {
+    expect(contrast(t.accent, t.surface)).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(t.bg, t.accent)).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(t.accent, t['accent-soft'])).toBeGreaterThanOrEqual(4.5)
+  })
+  it('başlık metinleri lacivert zeminde AA', () => {
+    expect(contrast(t['on-header'], t.header)).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(t['on-header-2'], t.header)).toBeGreaterThanOrEqual(4.5)
+  })
+  it.each([1, 2, 3, 4, 5])('avatar %i metni kendi soft zemininde AA', (i) => {
+    expect(contrast(t[`av-${i}`], t[`av-${i}-soft`])).toBeGreaterThanOrEqual(4.5)
+  })
 })
 
 describe('nextTheme', () => {

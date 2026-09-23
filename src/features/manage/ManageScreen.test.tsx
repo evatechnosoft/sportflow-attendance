@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ManageScreen } from './ManageScreen'
@@ -64,5 +64,60 @@ describe('ManageScreen — grup takvimi', () => {
 
     await screen.findByText('Cumartesi 17:00')
     expect((await db.groups.list())[0].schedule).toHaveLength(1)
+  })
+})
+
+describe('ManageScreen — A5 alanlar ve silme', () => {
+  afterEach(cleanup)
+
+  it('okul seçmeden grup eklenir', async () => {
+    const user = userEvent.setup({ delay: null })
+    const { db } = await setup()
+
+    await screen.findAllByText('Atatürk Ortaokulu')
+    await user.type(screen.getByLabelText('Grup adı'), 'Minikler')
+    await user.selectOptions(screen.getByLabelText('Branş'), 'Voleybol')
+    await user.click(screen.getByRole('button', { name: 'Grup ekle' }))
+
+    await screen.findByText('Minikler')
+    expect((await db.groups.list())[0].schoolId).toBeUndefined()
+  })
+
+  it('okul anahtarı kapanınca Okullar kartı ve okul seçimi gizlenir, veri durur', async () => {
+    const user = userEvent.setup({ delay: null })
+    const { db } = await setup(true)
+
+    const toggle = await screen.findByRole('switch', { name: /Okul/ })
+    expect(toggle.getAttribute('aria-checked')).toBe('true')
+    await user.click(toggle)
+
+    await waitFor(() => expect(screen.queryByText('Okullar')).toBeNull())
+    expect(screen.getByRole('switch', { name: /Okul/ }).getAttribute('aria-checked')).toBe('false')
+    expect(screen.queryByLabelText('Okul')).toBeNull()
+    expect(screen.queryByText(/Atatürk Ortaokulu/)).toBeNull()
+    expect((await db.settings.get()).fields.school).toBe(false)
+    expect(await db.schools.list()).toHaveLength(1)
+  })
+
+  it('okul onayla silinir, grubun okulu temizlenir', async () => {
+    const user = userEvent.setup({ delay: null })
+    const { db } = await setup(true)
+
+    await user.click(await screen.findByRole('button', { name: 'Atatürk Ortaokulu sil' }))
+    await user.click(screen.getByRole('button', { name: 'Sil' }))
+
+    await waitFor(async () => expect(await db.schools.list()).toHaveLength(0))
+    expect((await db.groups.list())[0].schoolId).toBeUndefined()
+  })
+
+  it('grubu olan branş silinmez, sebep kullanıcıya gösterilir', async () => {
+    const user = userEvent.setup({ delay: null })
+    const { db } = await setup(true)
+
+    await user.click(await screen.findByRole('button', { name: 'Voleybol sil' }))
+    await user.click(screen.getByRole('button', { name: 'Sil' }))
+
+    await screen.findByText('1 grup bu branşı kullanıyor')
+    expect(await db.branches.list()).toHaveLength(1)
   })
 })

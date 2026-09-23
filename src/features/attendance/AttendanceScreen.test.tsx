@@ -62,6 +62,26 @@ async function mark(user: ReturnType<typeof userEvent.setup>, name: string, labe
 describe('AttendanceScreen', () => {
   afterEach(cleanup)
 
+  it('okul alanı kapalıyken başlıkta okul adı ve ayırıcısı çıkmaz', async () => {
+    const { db } = await setup()
+    await db.settings.update({ fields: { school: false } })
+    cleanup()
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    render(
+      <QueryClientProvider client={client}>
+        <DataSourceProvider value={db}>
+          <SelectionProvider>
+            <AttendanceScreen />
+          </SelectionProvider>
+        </DataSourceProvider>
+      </QueryClientProvider>,
+    )
+    await screen.findByText('Can Erdoğan')
+    // Tam eşleşme: "Voleybol" tek başına — başta " · " ayırıcısı kalmamış.
+    expect((await screen.findAllByText('Voleybol')).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/Atatürk/)).toBeNull()
+  })
+
   it('grubun aktif oyuncularını listeler ve işaretlemeyi kaydeder', async () => {
     const user = userEvent.setup({ delay: null })
     const { db, group } = await setup()

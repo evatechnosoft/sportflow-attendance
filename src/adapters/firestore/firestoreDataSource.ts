@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore'
 import { DomainError, notFound } from '../../domain/errors'
 import { emptyCounts } from '../mock/mockDataSource'
-import type { Attendance, Group, School } from '../../domain/types'
+import { DEFAULT_CLUB_SETTINGS, type Attendance, type Group, type School } from '../../domain/types'
 import type { AttendanceMark, DataSource, GroupFilter } from '../../ports/repositories'
 import {
   buildAttendanceDoc,
@@ -145,6 +145,13 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
       // settings/features kuralı: allow read: if true — giriş öncesi de okunur.
       async clubIdentity() {
         return toClubIdentity(await loadSettings())
+      },
+      // Canlı şemada alan anahtarı yok: varsayılan döner, yazma kapalı.
+      async get() {
+        return { fields: { ...DEFAULT_CLUB_SETTINGS.fields } }
+      },
+      async update() {
+        throw readOnly()
       },
     },
 

@@ -27,7 +27,8 @@ export interface Group {
   id: Id
   name: string
   branchId: Id
-  schoolId: Id
+  /** Okul isteğe bağlı: okulsuz kulüp grupları da olur. */
+  schoolId?: Id
   coachName?: string
   schedule: ScheduleSlot[]
 }
@@ -76,6 +77,15 @@ export interface ClubIdentity {
   secondaryName: string
   description: string
 }
+
+/** Kulübün açıp kapatabildiği alanlar; ileride genişler. */
+export type OptionalField = 'school'
+
+export interface ClubSettings {
+  fields: Record<OptionalField, boolean>
+}
+
+export const DEFAULT_CLUB_SETTINGS: ClubSettings = { fields: { school: true } }
 
 export interface SessionSummary {
   sessionId: Id

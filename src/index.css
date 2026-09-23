@@ -19,6 +19,23 @@
   --late-soft: #fbebd9;
   --excused-soft: #e6e9ed;
   --absent-soft: #fae0e0;
+  /* Kulüp kimliği: lacivert başlık + enerjik turuncu vurgu (metin olarak da AA). */
+  --header: #1b2a4a;
+  --on-header: #ffffff;
+  --on-header-2: #b8c4dc;
+  --accent: #c2410c;
+  --accent-soft: #fff1e6;
+  /* Avatar paleti: isimden deterministik seçilir, durum renkleriyle karışmaz. */
+  --av-1: #1d4ed8;
+  --av-1-soft: #dfe8fd;
+  --av-2: #6d28d9;
+  --av-2-soft: #ede5fd;
+  --av-3: #0d6b63;
+  --av-3-soft: #dcf3ef;
+  --av-4: #be185d;
+  --av-4-soft: #fce4ef;
+  --av-5: #0b6a84;
+  --av-5-soft: #dcf0f6;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -40,6 +57,21 @@
     --late-soft: #2e2113;
     --excused-soft: #23272c;
     --absent-soft: #2e1616;
+    --header: #18223a;
+    --on-header: #eceef0;
+    --on-header-2: #a9b6d0;
+    --accent: #fb923c;
+    --accent-soft: #33200f;
+    --av-1: #8fb0ff;
+    --av-1-soft: #1a2540;
+    --av-2: #c4a8ff;
+    --av-2-soft: #2a1f45;
+    --av-3: #5fd4c4;
+    --av-3-soft: #10302c;
+    --av-4: #f48fb8;
+    --av-4-soft: #3a1a2a;
+    --av-5: #6fd0e6;
+    --av-5-soft: #0f2e36;
   }
 }
 
@@ -61,6 +93,21 @@
   --late-soft: #2e2113;
   --excused-soft: #23272c;
   --absent-soft: #2e1616;
+  --header: #18223a;
+  --on-header: #eceef0;
+  --on-header-2: #a9b6d0;
+  --accent: #fb923c;
+  --accent-soft: #33200f;
+  --av-1: #8fb0ff;
+  --av-1-soft: #1a2540;
+  --av-2: #c4a8ff;
+  --av-2-soft: #2a1f45;
+  --av-3: #5fd4c4;
+  --av-3-soft: #10302c;
+  --av-4: #f48fb8;
+  --av-4-soft: #3a1a2a;
+  --av-5: #6fd0e6;
+  --av-5-soft: #0f2e36;
 }
 
 @theme inline {
@@ -80,6 +127,21 @@
   --color-late-soft: var(--late-soft);
   --color-excused-soft: var(--excused-soft);
   --color-absent-soft: var(--absent-soft);
+  --color-header: var(--header);
+  --color-on-header: var(--on-header);
+  --color-on-header-2: var(--on-header-2);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-av-1: var(--av-1);
+  --color-av-1-soft: var(--av-1-soft);
+  --color-av-2: var(--av-2);
+  --color-av-2-soft: var(--av-2-soft);
+  --color-av-3: var(--av-3);
+  --color-av-3-soft: var(--av-3-soft);
+  --color-av-4: var(--av-4);
+  --color-av-4-soft: var(--av-4-soft);
+  --color-av-5: var(--av-5);
+  --color-av-5-soft: var(--av-5-soft);
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Bricolage Grotesque', 'Inter', ui-sans-serif, system-ui, sans-serif;
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);

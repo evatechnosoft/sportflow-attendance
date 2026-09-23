@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDataSource } from '../../app/dataSource'
 import { useSelection } from '../../app/selection'
 import type { AttendanceStatus } from '../../domain/types'
-import { useGroupOptions } from './useGroupOptions'
+import { joinParts, useGroupOptions } from './useGroupOptions'
 import { AttendanceRow } from './AttendanceRow'
 import { GroupSheet } from './GroupSheet'
 import { dayLabel, shiftDay, shortDate, weekdayOf, WEEKDAY_LABEL } from './date'
@@ -17,6 +17,23 @@ const SEGMENT: Record<AttendanceStatus, string> = {
   late: 'bg-late',
   excused: 'bg-excused',
   absent: 'bg-absent',
+}
+
+const CHIP: Record<AttendanceStatus, string> = {
+  present: 'bg-present-soft text-present',
+  late: 'bg-late-soft text-late',
+  excused: 'bg-excused-soft text-excused',
+  absent: 'bg-absent-soft text-absent',
+}
+
+function Chevron({ turn = '' }: { turn?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+      className={`h-5 w-5 ${turn}`}>
+      <path d="m15 6-6 6 6 6" />
+    </svg>
+  )
 }
 
 interface Toast {
@@ -143,18 +160,20 @@ export function AttendanceScreen() {
         className="flex h-14 w-full items-center justify-between gap-3 text-left disabled:opacity-50"
       >
         <span className="min-w-0">
-          <span className="block truncate font-display text-xl font-semibold">
+          <span className="block truncate font-display text-2xl font-bold tracking-tight">
             {selected?.label ?? 'Grup seç'}
           </span>
           {selected && (
-            <span className="block truncate text-xs text-ink-2">
-              {selected.schoolName} · {selected.branchName}
-              {selected.scheduleText && ` · ${selected.scheduleText}`}
+            <span className="block truncate text-xs font-medium text-ink-2">
+              {joinParts(selected.schoolName, selected.branchName, selected.scheduleText)}
             </span>
           )}
         </span>
-        <span aria-hidden="true" className="shrink-0 text-ink-2">
-          ▾
+        <span
+          aria-hidden="true"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink-2"
+        >
+          <Chevron turn="-rotate-90" />
         </span>
       </button>
 
@@ -167,14 +186,14 @@ export function AttendanceScreen() {
       />
 
       {/* 2. Tarih */}
-      <div className="flex items-center gap-2 border-y border-line py-2">
+      <div className="mt-2 flex items-center gap-1 rounded-[20px] border border-line bg-surface p-1">
         <button
           type="button"
           aria-label="Önceki gün"
           onClick={() => setDate(shiftDay(date, -1))}
-          className="h-11 w-11 shrink-0 rounded-full text-ink-2"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-ink-2 hover:bg-surface-2"
         >
-          ◀
+          <Chevron />
         </button>
         <button
           type="button"
@@ -196,58 +215,74 @@ export function AttendanceScreen() {
           type="button"
           aria-label="Sonraki gün"
           onClick={() => setDate(shiftDay(date, 1))}
-          className="h-11 w-11 shrink-0 rounded-full text-ink-2"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-ink-2 hover:bg-surface-2"
         >
-          ▶
+          <Chevron turn="rotate-180" />
         </button>
         {session.data && (
           <button
             type="button"
             onClick={() => setTimeOpen(true)}
-            className="shrink-0 rounded-full bg-surface-2 px-3 py-1 text-xs font-medium text-ink-2"
+            className="min-h-11 shrink-0 rounded-2xl bg-surface-2 px-3 text-xs font-semibold text-ink-2"
           >
             {`Saat: ${session.data.startTime ?? '—'}`}
           </button>
         )}
         {alreadySaved && (
-          <span className="shrink-0 rounded-full bg-present-soft px-2 py-1 text-xs font-medium text-present">
+          <span className="shrink-0 rounded-full bg-present-soft px-2 py-1 text-xs font-semibold text-present">
             ● kayıtlı
           </span>
         )}
       </div>
 
-      {/* 3. Yığılmış ilerleme */}
-      <div className="py-3">
-        <div className="flex h-2 overflow-hidden rounded-full bg-surface-2">
+      {/* 3. Yığılmış ilerleme + durum çipleri */}
+      <div className="py-4">
+        <div className="mb-2 flex items-baseline justify-between gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-ink-2">Yoklama</span>
+          <span className="font-display text-sm font-bold tabular-nums text-ink">
+            {summary.marked}/{summary.total} işaretli
+            {summary.rate !== null && ` · %${summary.rate} katılım`}
+          </span>
+        </div>
+        <div className="flex h-3 gap-0.5 overflow-hidden rounded-full bg-surface-2">
           {STATUSES.map((status) => (
             <span
               key={status}
-              className={SEGMENT[status]}
+              className={`${SEGMENT[status]} transition-[width] duration-300`}
               style={{
                 width: summary.total ? `${(summary.counts[status] / summary.total) * 100}%` : '0%',
               }}
             />
           ))}
         </div>
-        <div className="mt-1 flex items-baseline justify-between gap-2 text-xs text-ink-2">
-          {summary.marked === 0 ? (
-            <span>henüz işaretlenmedi</span>
-          ) : (
-            <span className="truncate">
-              {STATUSES.filter((status) => summary.counts[status] > 0)
-                .map((status) => `${summary.counts[status]} ${STATUS_LABEL[status].toLocaleLowerCase('tr-TR')}`)
-                .join(' · ')}
-            </span>
-          )}
-          <span className="shrink-0 font-medium text-ink">
-            {summary.marked}/{summary.total}
-            {summary.rate !== null && ` · %${summary.rate}`}
-          </span>
-        </div>
+        {summary.marked === 0 ? (
+          <p className="mt-2 text-xs text-ink-2">henüz işaretlenmedi</p>
+        ) : (
+          <div className="mt-2 grid grid-cols-4 gap-1.5">
+            {STATUSES.map((status) => (
+              <span
+                key={status}
+                className={`flex items-baseline justify-center gap-1 rounded-xl px-1 py-1.5 text-xs font-semibold ${CHIP[status]} ${
+                  summary.counts[status] === 0 ? 'opacity-50' : ''
+                }`}
+              >
+                <span className="font-display text-base font-bold tabular-nums">
+                  {summary.counts[status]}
+                </span>
+                {STATUS_LABEL[status]}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {offDay && (
-        <p className="mb-2 rounded-2xl bg-late-soft px-4 py-2 text-sm text-late">
+        <p className="mb-3 flex items-center gap-2 rounded-xl border-l-4 border-late bg-late-soft px-3 py-2 text-sm font-medium text-late">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-4 w-4 shrink-0">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 8v5M12 16h.01" />
+          </svg>
           {`Bu grubun ${WEEKDAY_LABEL[weekdayOf(date)]} antrenmanı yok`}
         </p>
       )}
@@ -291,7 +326,7 @@ export function AttendanceScreen() {
               type="button"
               disabled={!session.data || save.isPending}
               onClick={() => save.mutate()}
-              className="h-[52px] w-full rounded-2xl bg-brand font-display font-semibold text-bg disabled:opacity-40"
+              className="h-[52px] w-full rounded-2xl bg-accent font-display font-bold tracking-wide text-bg shadow-sm disabled:opacity-40"
             >
               {save.isPending
                 ? 'Kaydediliyor…'

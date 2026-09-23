@@ -6,8 +6,6 @@ import type { AttendanceStatus, Group, Player, School } from '../../domain/types
  * durumları Türkçe string. Çeviri saf tutulur ki testi ucuz olsun.
  */
 
-export const UNASSIGNED_SCHOOL = 'school-unassigned'
-
 const STATUS_FROM_FIRESTORE: Record<string, AttendanceStatus> = {
   Geldi: 'present',
   Gelmedi: 'absent',
@@ -75,7 +73,7 @@ export function toGroup(id: string, raw: FirestoreGroup): Group {
     id,
     name: groupDisplayName(raw.name, startTimeOf(raw)),
     branchId: raw.branchId ?? '',
-    schoolId: raw.schoolId ?? UNASSIGNED_SCHOOL,
+    schoolId: raw.schoolId,
     coachName: raw.coachId,
     // Canlı grup belgesinde gün yok, yalnız saat var: uydurma gün üretmeyiz.
     schedule: [],
@@ -166,9 +164,6 @@ export function groupDisplayName(name: string | undefined, startTime?: string): 
  * türetilir; ayrı koleksiyon okunmaz.
  */
 export function schoolsFromGroups(groups: Group[]): School[] {
-  const ids = new Set(groups.map((group) => group.schoolId))
-  return [...ids].map((id) => ({
-    id,
-    name: id === UNASSIGNED_SCHOOL ? 'Okul atanmamış' : id,
-  }))
+  const ids = new Set(groups.flatMap((group) => (group.schoolId ? [group.schoolId] : [])))
+  return [...ids].map((id) => ({ id, name: id }))
 }
