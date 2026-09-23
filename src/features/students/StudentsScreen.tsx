@@ -107,7 +107,16 @@ export function StudentsScreen() {
 
   return (
     <section>
-      <div className="flex h-14 items-center justify-between gap-3">
+      {/* Başlık: listelenen grubu değiştirir — Yoklama ekranıyla aynı seçici. */}
+      <button
+        type="button"
+        onClick={() => {
+          setMoveFor(null)
+          setSheetOpen(true)
+        }}
+        disabled={!groups.data?.length}
+        className="flex h-14 w-full items-center justify-between gap-3 text-left disabled:opacity-50"
+      >
         <span className="min-w-0">
           <span className="block truncate font-display text-xl font-semibold">
             {selected?.label ?? 'Grup seç'}
@@ -118,8 +127,11 @@ export function StudentsScreen() {
             </span>
           )}
         </span>
-        <span className="shrink-0 text-xs text-ink-2">{active.length} aktif</span>
-      </div>
+        <span className="flex shrink-0 items-center gap-1 text-xs text-ink-2">
+          {active.length} aktif
+          <span aria-hidden="true">▾</span>
+        </span>
+      </button>
 
       {error && (
         <p className="mb-3 rounded-xl bg-absent-soft px-4 py-2 text-sm text-absent">{error}</p>
@@ -191,6 +203,8 @@ export function StudentsScreen() {
           const target = groups.data?.find((group) => group.id === id)
           if (moveFor && target) {
             setPending({ kind: 'move', player: moveFor, groupId: id, groupLabel: target.label })
+          } else {
+            setGroupId(id)
           }
         }}
         onClose={() => setSheetOpen(false)}

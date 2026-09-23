@@ -114,6 +114,25 @@ describe('StudentsScreen', () => {
     expect(moved.groupHistory.at(-1)?.leftOn).toBeUndefined()
   })
 
+  it('başlıktan grup değiştirilince o grubun listesi gelir', async () => {
+    const user = userEvent.setup({ delay: null })
+    const { db, other } = await setup()
+    await db.players.create({
+      firstName: 'Zeynep',
+      lastName: 'Kaya',
+      groupId: other.id,
+      status: 'active',
+      groupHistory: [{ groupId: other.id, joinedOn: '2026-09-01' }],
+    })
+
+    await screen.findByText('Ada Yıldız')
+    await user.click(screen.getByRole('button', { name: /Voleybol U12/ }))
+    await user.click(screen.getByRole('button', { name: /Voleybol U14/ }))
+
+    await screen.findByText('Zeynep Kaya')
+    expect(screen.queryByText('Ada Yıldız')).toBeNull()
+  })
+
   it('ayrıldı işaretlenince sporcu Ayrılanlar bölümüne geçer', async () => {
     const user = userEvent.setup({ delay: null })
     const { db, group } = await setup()

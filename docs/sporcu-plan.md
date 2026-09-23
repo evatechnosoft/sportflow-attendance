@@ -651,13 +651,41 @@ Faz A onaylanmadan detaylandırılmaz. Bugünden bilinenler:
 
 ## Faz C — CRM (ayrı spec)
 
-Faz A/B'den bağımsız olarak, sırasıyla karara bağlanacak:
+### Kararlar [Dean, 2026-09-23]
 
-1. Hangi repo taşıyıcı olacak — dört adaydan biri seçilir, kalanlar arşivlenir. Beşinci iskelet açılmaz.
-2. Alan-tanımlı şema (kullanıcı alan ekler, ekran kendini çizer) — sıfırdan iş,
-   ports/adapters disiplinine oturtulacak. Tek başına bir spec.
-3. Veli bilgilendirme kanalı: **WhatsApp/SMS taslağı, tıkla-aç** [Dean, 2026-09-23]
-   — `wa.me/<telefon>?text=<mesaj>` ve `sms:` linkleri; API, ücret, sunucu yok.
-   SportFlow tarafında karşılığı sadece `guardianPhone` alanının dolu tutulması.
-4. Ödeme/aidat `clubcrm`'de kalır; `playerId` bağı Faz B sonrası `students`
-   belgelerine işaret eder.
+- **İlk gerçek kullanıcı: kulüp aidatı (Anadolu Spor).** Ürün olarak değil, yürüyen
+  bir iş olarak bitirilecek. Genel CRM bu çalışan dikeyden türetilir.
+- **Alan-tanımlı yapı: önce şablon, sonra dinamik.** Alan setleri kodda sektör
+  şablonu olarak tanımlanır (kulüp · sigorta · özel ders), ama alan tanımı
+  **veri olarak** taşınır (`FieldDef[]` + kayıtta `customFields`), ki sonradan
+  kullanıcıya açmak yalnız ekran işi kalsın — şema göçü gerekmesin.
+- **Taşıyıcı repo: `clubcrm`.** İlk iş zaten orada yazılı ve tek çalışan CRM o.
+  `flexcrm`, `modularcrm`, `luminaglasscrm` **arşiv adayı** — Dean onayı olmadan
+  taşınmaz/silinmez.
+- **Veli bilgilendirme: WhatsApp/SMS taslağı, tıkla-aç.** `wa.me/<telefon>?text=`
+  ve `sms:` linkleri; API yok, ücret yok, sunucu yok.
+
+### Sıralama sonucu — Faz B, Faz C'nin ön şartı
+
+`clubcrm` sporcuya `Customer.playerIds` ile bağlanıyor
+(`clubcrm/src/domain/types.ts:17`). Canlı sporcu kaydı olmadan CRM gerçek veriyle
+çalışamaz. Dolayısıyla sıra: **A → B → C**. Faz C'ye Faz B bitmeden girilmez.
+
+### Faz C'ye girmeden kapatılacaklar
+
+1. `modularcrm/HANDOFF.md` düz metin parolaları — döndür, dosyayı pointer'a çevir.
+2. `flexcrm` `feature/supabase-tdd-cleanup` dalı — kapat ya da at; kirli çalışma
+   alanı bırakılmaz.
+3. Arşiv kararı: hangi repolar kapanıyor, nereye taşınıyor.
+
+### Açık sorular (Faz C spec'inde cevaplanacak)
+
+- `clubcrm` domain'i genelleşirken adlandırma: `FeePlan`/`Installment` kulüp-özel
+  mi kalacak, yoksa `Agreement`/`Schedule` gibi sektör-bağımsız isme mi geçecek?
+  Yeniden adlandırmanın bedeli ile şablon başına ayrı domain tutmanın bedeli
+  karşılaştırılmalı.
+- Ödedi/ödemedi **grup grup süzme**: grup bilgisi SportFlow'da, ödeme clubcrm'de.
+  Süzme hangi tarafta yapılacak — CRM sporcu→grup eşlemesini okuyacak mı, yoksa
+  SportFlow grup listesini dışa mı verecek?
+- `customFields` Firestore'da süzülebilir mi: alan başına index gerekir; hangi
+  alanların süzülebilir olacağı şablonda işaretlenmeli.
