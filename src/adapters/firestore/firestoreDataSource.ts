@@ -126,6 +126,9 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
       async ensure(groupId, date, startTime) {
         return { id: sessionDocId(groupId, date), groupId, date, startTime }
       },
+      async update() {
+        throw readOnly()
+      },
       async listByGroup(groupId) {
         const snapshot = await getDocs(
           query(collection(db, 'attendance'), where('groupId', '==', groupId)),

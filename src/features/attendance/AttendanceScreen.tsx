@@ -8,6 +8,8 @@ import { AttendanceRow } from './AttendanceRow'
 import { GroupSheet } from './GroupSheet'
 import { dayLabel, shiftDay, shortDate, weekdayOf, WEEKDAY_LABEL } from './date'
 import { hasSlotOn } from '../manage/schedule'
+import { useDialog } from '../../app/useDialog'
+import type { ScheduleSlot } from '../../domain/types'
 import { isDirty, marksFromRows, STATUSES, STATUS_LABEL, summarize, type Marks } from './summary'
 
 const SEGMENT: Record<AttendanceStatus, string> = {
@@ -32,6 +34,7 @@ export function AttendanceScreen() {
   const [marks, setMarks] = useState<Marks>({})
   const [sheetOpen, setSheetOpen] = useState(false)
   const [toast, setToast] = useState<Toast | null>(null)
+  const [timeOpen, setTimeOpen] = useState(false)
   const dateInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -41,7 +44,7 @@ export function AttendanceScreen() {
   const session = useQuery({
     queryKey: ['session', groupId, date],
     enabled: Boolean(groupId),
-    queryFn: () => db.sessions.ensure(groupId, date),
+    queryFn: () => db.sessions.ensure(groupId, date, slotOfDay?.startTime),
   })
 
   const players = useQuery({
@@ -74,6 +77,23 @@ export function AttendanceScreen() {
     },
   })
 
+  const setTime = useMutation({
+    mutationFn: async ({ startTime, forever }: { startTime: string; forever: boolean }) => {
+      await db.sessions.update(session.data!.id, { startTime })
+      if (forever && slotOfDay) {
+        const schedule: ScheduleSlot[] = selected!.schedule.map((slot) =>
+          slot === slotOfDay ? { ...slot, startTime } : slot,
+        )
+        await db.groups.update(groupId, { schedule })
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['session', groupId, date] })
+      queryClient.invalidateQueries({ queryKey: ['group-options'] })
+      setTimeOpen(false)
+    },
+  })
+
   // Tek toast; yenisi eskisini ezer, süre dolunca söner.
   useEffect(() => {
     if (!toast) return
@@ -87,6 +107,7 @@ export function AttendanceScreen() {
   )
 
   const selected = groups.data?.find((group) => group.id === groupId)
+  const slotOfDay = selected?.schedule.find((slot) => slot.weekday === weekdayOf(date))
   // Kural 4-5: takvimi tanımlı grupta, o güne slot yoksa uyar — kaydetmeyi engelleme.
   const offDay =
     selected && selected.schedule.length > 0 && !hasSlotOn(selected.schedule, weekdayOf(date))
@@ -179,6 +200,15 @@ export function AttendanceScreen() {
         >
           ▶
         </button>
+        {session.data && (
+          <button
+            type="button"
+            onClick={() => setTimeOpen(true)}
+            className="shrink-0 rounded-full bg-surface-2 px-3 py-1 text-xs font-medium text-ink-2"
+          >
+            {`Saat: ${session.data.startTime ?? '—'}`}
+          </button>
+        )}
         {alreadySaved && (
           <span className="shrink-0 rounded-full bg-present-soft px-2 py-1 text-xs font-medium text-present">
             ● kayıtlı
@@ -271,6 +301,15 @@ export function AttendanceScreen() {
         </div>
       )}
 
+      <TimeSheet
+        open={timeOpen}
+        startTime={session.data?.startTime ?? ''}
+        canRepeat={Boolean(slotOfDay)}
+        busy={setTime.isPending}
+        onSubmit={(startTime, forever) => setTime.mutate({ startTime, forever })}
+        onClose={() => setTimeOpen(false)}
+      />
+
       {/* 7-8. Tek toast yeri */}
       {toast && (
         <div className="fixed inset-x-0 bottom-[calc(148px+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-3xl justify-center px-4">
@@ -292,5 +331,64 @@ export function AttendanceScreen() {
         </div>
       )}
     </section>
+  )
+}
+
+/** Oturum saati: yalnız bu oturum, ya da grubun o günkü slotu da. */
+function TimeSheet({
+  open,
+  startTime,
+  canRepeat,
+  busy,
+  onSubmit,
+  onClose,
+}: {
+  open: boolean
+  startTime: string
+  canRepeat: boolean
+  busy: boolean
+  onSubmit: (startTime: string, forever: boolean) => void
+  onClose: () => void
+}) {
+  const ref = useDialog(open)
+  const [value, setValue] = useState(startTime)
+
+  useEffect(() => {
+    if (open) setValue(startTime)
+  }, [open, startTime])
+
+  return (
+    <dialog ref={ref} className="sheet" onClose={onClose} onClick={onClose}>
+      <div className="rounded-t-[26px] bg-surface p-4" onClick={(event) => event.stopPropagation()}>
+        <p className="mb-3 font-display text-lg font-semibold">Oturum saati</p>
+        <input
+          type="time"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          aria-label="Oturum saati"
+          className="mb-3 min-h-11 w-full rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
+        />
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            disabled={busy || !value}
+            onClick={() => onSubmit(value, false)}
+            className="min-h-[52px] w-full rounded-2xl bg-brand font-medium text-bg disabled:opacity-40"
+          >
+            Yalnız bu oturum
+          </button>
+          {canRepeat && (
+            <button
+              type="button"
+              disabled={busy || !value}
+              onClick={() => onSubmit(value, true)}
+              className="min-h-[52px] w-full rounded-2xl bg-surface-2 font-medium text-ink disabled:opacity-40"
+            >
+              Bundan sonra hep
+            </button>
+          )}
+        </div>
+      </div>
+    </dialog>
   )
 }

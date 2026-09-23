@@ -177,6 +177,10 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
         if (!row) throw notFound('Oyuncu', id)
         for (const spell of patch.groupHistory ?? []) requireGroup(spell.groupId)
         Object.assign(row, patch)
+        // Durum üyelikten türetilir; çağıranın gönderdiği status'e güvenilmez.
+        if (patch.groupHistory) {
+          row.status = row.groupHistory.some((spell) => !spell.leftOn) ? 'active' : 'inactive'
+        }
         return { ...row }
       },
     },
@@ -188,6 +192,12 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
         if (existing) return { ...existing }
         const row: Session = { id: nextId('session'), groupId, date, startTime }
         sessions.push(row)
+        return { ...row }
+      },
+      async update(id, patch) {
+        const row = sessions.find((candidate) => candidate.id === id)
+        if (!row) throw notFound('Oturum', id)
+        Object.assign(row, patch)
         return { ...row }
       },
       async listByGroup(groupId) {

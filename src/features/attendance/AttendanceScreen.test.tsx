@@ -113,4 +113,47 @@ describe('AttendanceScreen', () => {
     await screen.findByText('Can Erdoğan')
     expect(screen.queryByText(/antrenmanı yok/)).toBeNull()
   })
+
+  it('saat yalnız bu oturum için değiştirilir, grubun takvimi durur', async () => {
+    const user = userEvent.setup({ delay: null })
+    const today = weekdayOf(todayIso())
+    const { db, group } = await setup([{ weekday: today, startTime: '17:00', durationMinutes: 90 }])
+
+    await screen.findByRole('button', { name: 'Saat: 17:00' })
+    await user.click(screen.getByRole('button', { name: 'Saat: 17:00' }))
+    await user.clear(screen.getByLabelText('Oturum saati'))
+    await user.type(screen.getByLabelText('Oturum saati'), '18:30')
+    await user.click(screen.getByRole('button', { name: 'Yalnız bu oturum' }))
+
+    await screen.findByRole('button', { name: 'Saat: 18:30' })
+    expect((await db.sessions.listByGroup(group.id))[0].startTime).toBe('18:30')
+    expect((await db.groups.list())[0].schedule[0].startTime).toBe('17:00')
+  })
+
+  it('bundan sonra hep seçilince grubun o günkü slotu da güncellenir', async () => {
+    const user = userEvent.setup({ delay: null })
+    const today = weekdayOf(todayIso())
+    const { db, group } = await setup([{ weekday: today, startTime: '17:00', durationMinutes: 90 }])
+
+    await screen.findByRole('button', { name: 'Saat: 17:00' })
+    await user.click(screen.getByRole('button', { name: 'Saat: 17:00' }))
+    await user.clear(screen.getByLabelText('Oturum saati'))
+    await user.type(screen.getByLabelText('Oturum saati'), '18:30')
+    await user.click(screen.getByRole('button', { name: 'Bundan sonra hep' }))
+
+    await waitFor(async () =>
+      expect((await db.groups.list())[0].schedule[0].startTime).toBe('18:30'),
+    )
+    expect((await db.sessions.listByGroup(group.id))[0].startTime).toBe('18:30')
+  })
+
+  it('takvim dışı günde bundan sonra hep seçeneği çıkmaz', async () => {
+    const user = userEvent.setup({ delay: null })
+    await setup([{ weekday: otherWeekday(), startTime: '17:00', durationMinutes: 90 }])
+
+    await screen.findByText('Can Erdoğan')
+    await user.click(screen.getByRole('button', { name: /^Saat:/ }))
+    expect(screen.getByRole('button', { name: 'Yalnız bu oturum' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Bundan sonra hep' })).toBeNull()
+  })
 })

@@ -46,6 +46,8 @@ export interface PlayerRepository {
 export interface SessionRepository {
   /** Aynı grup + tarih için ikinci oturum açmaz, var olanı döner. */
   ensure(groupId: Id, date: string, startTime?: string): Promise<Session>
+  /** Salon sınav olunca saat kayar — yalnız o oturumu etkiler. */
+  update(id: Id, patch: { startTime?: string }): Promise<Session>
   listByGroup(groupId: Id): Promise<Session[]>
 }
 
