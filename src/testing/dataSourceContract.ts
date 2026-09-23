@@ -79,6 +79,55 @@ export function runDataSourceContract(name: string, makeDataSource: () => DataSo
         await expect(db.groups.remove(group.id)).rejects.toMatchObject({ code: 'in_use' })
       })
 
+      it('grubun antrenman günleri güncellenir', async () => {
+        const group = await seedGroup()
+        const updated = await db.groups.update(group.id, {
+          schedule: [
+            { weekday: 2, startTime: '17:00', durationMinutes: 90 },
+            { weekday: 6, startTime: '10:00', durationMinutes: 60 },
+          ],
+        })
+        expect(updated.schedule).toHaveLength(2)
+        expect((await db.groups.list())[0].schedule).toHaveLength(2)
+      })
+
+      it('1-7 dışındaki gün kabul edilmez', async () => {
+        const group = await seedGroup()
+        await expect(
+          db.groups.update(group.id, {
+            schedule: [{ weekday: 0, startTime: '17:00', durationMinutes: 90 }],
+          }),
+        ).rejects.toMatchObject({ code: 'invalid' })
+        await expect(
+          db.groups.update(group.id, {
+            schedule: [{ weekday: 8, startTime: '17:00', durationMinutes: 90 }],
+          }),
+        ).rejects.toMatchObject({ code: 'invalid' })
+      })
+
+      it('aynı gün ve saat için iki slot açılamaz', async () => {
+        const group = await seedGroup()
+        await expect(
+          db.groups.update(group.id, {
+            schedule: [
+              { weekday: 2, startTime: '17:00', durationMinutes: 90 },
+              { weekday: 2, startTime: '17:00', durationMinutes: 60 },
+            ],
+          }),
+        ).rejects.toMatchObject({ code: 'duplicate' })
+      })
+
+      it('boş takvim geçerlidir', async () => {
+        const group = await seedGroup()
+        expect((await db.groups.update(group.id, { schedule: [] })).schedule).toEqual([])
+      })
+
+      it('olmayan grup güncellenemez', async () => {
+        await expect(db.groups.update('yok', { schedule: [] })).rejects.toMatchObject({
+          code: 'not_found',
+        })
+      })
+
       it('boş grup silinir', async () => {
         const group = await seedGroup()
         await db.groups.remove(group.id)

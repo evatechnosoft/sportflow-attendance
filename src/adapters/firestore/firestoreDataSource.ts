@@ -21,7 +21,6 @@ import {
   schoolsFromGroups,
   toBranches,
   toClubIdentity,
-  toGroup,
   toPlayer,
   type FirestoreAthlete,
   type FirestoreGroup,
@@ -53,7 +52,9 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
 
   const loadGroups = async (): Promise<Group[]> => {
     const snapshot = await getDocs(collection(db, 'groups'))
-    return dedupeGroups(snapshot.docs.map((row) => toGroup(row.id, row.data() as FirestoreGroup)))
+    return dedupeGroups(
+      snapshot.docs.map((row) => ({ id: row.id, raw: row.data() as FirestoreGroup })),
+    )
   }
 
   return {
@@ -92,6 +93,9 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
         )
       },
       async create() {
+        throw readOnly()
+      },
+      async update() {
         throw readOnly()
       },
       async remove() {

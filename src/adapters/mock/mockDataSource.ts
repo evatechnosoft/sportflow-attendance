@@ -1,4 +1,4 @@
-import { duplicate, inUse, notFound } from '../../domain/errors'
+import { duplicate, inUse, invalid, notFound } from '../../domain/errors'
 import type {
   Attendance,
   AttendanceStatus,
@@ -6,6 +6,7 @@ import type {
   Group,
   Id,
   Player,
+  ScheduleSlot,
   School,
   Session,
 } from '../../domain/types'
@@ -50,6 +51,19 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
 
   let counter = 0
   const nextId = (prefix: string) => `${prefix}-${++counter}`
+
+  /** Kural 1-2: gün 1-7 aralığında ve gün + saat çifti tekil. */
+  const requireValidSchedule = (schedule: ScheduleSlot[]) => {
+    const seen = new Set<string>()
+    for (const slot of schedule) {
+      if (!Number.isInteger(slot.weekday) || slot.weekday < 1 || slot.weekday > 7) {
+        throw invalid('Antrenman günü', `${slot.weekday} — 1-7 aralığında olmalı`)
+      }
+      const key = `${slot.weekday}|${slot.startTime}`
+      if (seen.has(key)) throw duplicate('Grup', 'gün + saat', key)
+      seen.add(key)
+    }
+  }
 
   const requireGroup = (id: Id) => {
     const group = groups.find((row) => row.id === id)
@@ -118,8 +132,15 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
         if (!branches.some((row) => row.id === input.branchId)) {
           throw notFound('Branş', input.branchId)
         }
+        requireValidSchedule(input.schedule)
         const row: Group = { ...input, id: nextId('group') }
         groups.push(row)
+        return { ...row }
+      },
+      async update(id, patch) {
+        const row = requireGroup(id)
+        if (patch.schedule) requireValidSchedule(patch.schedule)
+        Object.assign(row, patch)
         return { ...row }
       },
       async remove(id) {

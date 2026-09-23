@@ -31,6 +31,8 @@ export interface GroupFilter {
 export interface GroupRepository {
   list(filter?: GroupFilter): Promise<Group[]>
   create(input: Omit<Group, 'id'>): Promise<Group>
+  /** Ad, okul/branş ve antrenman takvimi tek kapıdan güncellenir. */
+  update(id: Id, patch: Partial<Omit<Group, 'id'>>): Promise<Group>
   remove(id: Id): Promise<void>
 }
 
