@@ -61,6 +61,11 @@ export function ManageScreen() {
 
   return (
     <section className="space-y-4">
+      <div className="flex h-14 flex-col justify-center">
+        <h2 className="font-display text-2xl font-bold tracking-tight">Tanımlar</h2>
+        <p className="text-xs font-medium text-ink-2">Okul, branş ve grupların antrenman günleri</p>
+      </div>
+
       {error && (
         <p className="rounded-xl bg-absent-soft px-4 py-2 text-sm text-absent">{error}</p>
       )}
@@ -86,10 +91,10 @@ export function ManageScreen() {
             const school = schools.data?.find((row) => row.id === group.schoolId)
             const branch = branches.data?.find((row) => row.id === group.branchId)
             return (
-              <li key={group.id} className="rounded-lg bg-surface-2 px-3 py-2">
+              <li key={group.id} className="rounded-2xl border border-line bg-surface-2 px-3 py-2.5">
                 <div className="flex justify-between gap-2">
-                  <span className="font-medium">{group.name}</span>
-                  <span className="text-ink-2">
+                  <span className="font-semibold">{group.name}</span>
+                  <span className="min-w-0 truncate text-ink-2">
                     {school?.name ?? '—'} · {branch?.name ?? '—'}
                   </span>
                 </div>
@@ -118,9 +123,14 @@ function Card({
 }) {
   return (
     <div className="rounded-[20px] border border-line bg-surface p-4">
-      <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="font-display font-semibold">{title}</h2>
-        <span className="text-xs text-ink-3">{count ?? 0} kayıt</span>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h3 className="flex items-center gap-2 font-display text-lg font-bold">
+          <span aria-hidden="true" className="h-5 w-1.5 rounded-full bg-accent" />
+          {title}
+        </h3>
+        <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-semibold text-ink-2">
+          {count ?? 0} kayıt
+        </span>
       </div>
       {children}
     </div>
@@ -236,7 +246,7 @@ function Chips({ items }: { items: string[] }) {
   return (
     <div className="mt-3 flex flex-wrap gap-2">
       {items.map((item) => (
-        <span key={item} className="rounded-full bg-surface-2 px-3 py-1 text-xs text-ink-2">
+        <span key={item} className="rounded-full border border-line bg-surface-2 px-3 py-1 text-xs font-medium text-ink">
           {item}
         </span>
       ))}
@@ -328,7 +338,7 @@ function ScheduleRow({
         <button
           type="button"
           onClick={() => setDraft(schedule)}
-          className="shrink-0 text-ink-2 underline underline-offset-2"
+          className="min-h-11 shrink-0 font-semibold text-accent underline-offset-2 hover:underline"
         >
           Günleri düzenle
         </button>

@@ -8,6 +8,7 @@ import type { Id, Player } from '../../domain/types'
 import { GroupSheet } from '../attendance/GroupSheet'
 import { useGroupOptions } from '../attendance/useGroupOptions'
 import { todayIso } from '../attendance/date'
+import { avatarTone, initials } from '../attendance/avatar'
 import {
   ageOn,
   changeGroup,
@@ -127,16 +128,16 @@ export function StudentsScreen() {
         className="flex h-14 w-full items-center justify-between gap-3 text-left disabled:opacity-50"
       >
         <span className="min-w-0">
-          <span className="block truncate font-display text-xl font-semibold">
+          <span className="block truncate font-display text-2xl font-bold tracking-tight">
             {selected?.label ?? 'Grup seç'}
           </span>
           {selected && (
-            <span className="block truncate text-xs text-ink-2">
+            <span className="block truncate text-xs font-medium text-ink-2">
               {selected.schoolName} · {selected.branchName}
             </span>
           )}
         </span>
-        <span className="flex shrink-0 items-center gap-1 text-xs text-ink-2">
+        <span className="flex shrink-0 items-center gap-1 rounded-full bg-accent-soft px-3 py-1 text-xs font-bold text-accent">
           {active.length} aktif
           <span aria-hidden="true">▾</span>
         </span>
@@ -150,7 +151,7 @@ export function StudentsScreen() {
         type="button"
         onClick={() => setAdding((prev) => !prev)}
         disabled={!groupId}
-        className="mb-3 min-h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm font-medium disabled:opacity-50"
+        className="mb-3 mt-2 min-h-11 w-full rounded-2xl border-2 border-dashed border-accent/40 bg-accent-soft px-4 text-sm font-bold text-accent disabled:opacity-50"
       >
         + Sporcu ekle
       </button>
@@ -257,9 +258,15 @@ function StudentRow({
   const groupCount = openSpells(player).length
   return (
     <li className="overflow-hidden rounded-2xl border border-line bg-surface">
-      <div className="flex min-h-[72px] items-center gap-3 px-4">
+      <div className="flex min-h-[72px] items-center gap-3 pl-3 pr-2">
+        <span
+          aria-hidden="true"
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full font-display text-sm font-bold ${avatarTone(fullName(player))}`}
+        >
+          {initials(player)}
+        </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium">
+          <span className="block truncate font-semibold">
             {fullName(player)}
             {groupCount > 1 && (
               <span className="ml-2 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-2">
@@ -268,7 +275,7 @@ function StudentRow({
             )}
           </span>
           {player.birthDate && (
-            <span className="block text-xs text-ink-3">
+            <span className="block text-xs text-ink-2">
               {player.birthDate.slice(0, 4)}
               {age !== null && ` · ${age} yaş`}
             </span>
@@ -279,7 +286,7 @@ function StudentRow({
           aria-label={`${fullName(player)} işlemleri`}
           aria-expanded={open}
           onClick={onToggle}
-          className="h-11 w-11 shrink-0 rounded-full text-ink-2"
+          className="h-11 w-11 shrink-0 rounded-full text-lg font-bold text-ink-2 hover:bg-surface-2"
         >
           ⋯
         </button>

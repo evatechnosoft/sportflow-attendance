@@ -9,6 +9,7 @@ import {
 import type { AttendanceStatus, Player } from '../../domain/types'
 import { STATUSES, STATUS_LABEL } from './summary'
 import { isDrag, resolveSwipe, SWIPE_THRESHOLD } from './swipe'
+import { initials } from './avatar'
 
 // Tailwind sınıfları statik olmak zorunda (JIT tarama) — bu yüzden tam ad tablosu.
 const STRIPE: Record<AttendanceStatus, string> = {
@@ -16,13 +17,6 @@ const STRIPE: Record<AttendanceStatus, string> = {
   late: 'bg-late',
   excused: 'bg-excused',
   absent: 'bg-absent',
-}
-
-const BADGE: Record<AttendanceStatus, string> = {
-  present: 'bg-present-soft text-present',
-  late: 'bg-late-soft text-late',
-  excused: 'bg-excused-soft text-excused',
-  absent: 'bg-absent-soft text-absent',
 }
 
 const SEGMENT_ACTIVE: Record<AttendanceStatus, string> = {
@@ -55,10 +49,6 @@ function XIcon() {
       <path d="M18 6 6 18M6 6l12 12" />
     </svg>
   )
-}
-
-function initials(player: Player): string {
-  return `${player.firstName.charAt(0)}${player.lastName.charAt(0)}`.toLocaleUpperCase('tr-TR')
 }
 
 export function AttendanceRow({
@@ -143,24 +133,24 @@ export function AttendanceRow({
           }}
           className="flex min-h-[72px] w-full items-center gap-3 pr-4 text-left"
         >
-          <span className={`h-[72px] w-1 shrink-0 ${status ? STRIPE[status] : 'bg-line'}`} />
+          <span className={`h-[72px] w-1.5 shrink-0 ${status ? STRIPE[status] : 'bg-line'}`} />
           <span
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
-              status ? BADGE[status] : 'bg-surface-2 text-ink-2'
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-display text-sm font-bold transition-colors ${
+              status ? SEGMENT_ACTIVE[status] : 'bg-surface-2 text-ink-2'
             }`}
           >
             {initials(player)}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-medium">{fullName}</span>
+            <span className="block truncate font-semibold">{fullName}</span>
             {expanded && (
-              <span className="mt-0.5 block truncate text-xs text-ink-3">
+              <span className="mt-0.5 block truncate text-xs text-ink-2">
                 {player.guardianName ? `Veli: ${player.guardianName}` : 'Veli bilgisi yok'}
                 {player.guardianPhone ? ` · ${player.guardianPhone}` : ''}
               </span>
             )}
           </span>
-          <span className={`shrink-0 text-xs font-semibold ${status ? LABEL_TEXT[status] : 'text-ink-3'}`}>
+          <span className={`shrink-0 text-xs font-bold uppercase tracking-wide ${status ? LABEL_TEXT[status] : 'text-ink-3'}`}>
             {status ? STATUS_LABEL[status] : '—'}
           </span>
         </button>

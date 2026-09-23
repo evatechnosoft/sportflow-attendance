@@ -36,16 +36,26 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col">
-      <header className="sticky top-0 z-10 border-b border-line bg-bg/85 px-4 py-3 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b-[3px] border-accent bg-header px-4 py-3 text-on-header">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <h1 className="min-w-0 truncate font-display text-base font-semibold tracking-tight">
-              {club.data?.primaryName ?? 'SportFlow'}
-              {club.data?.secondaryName && (
-                <span className="ml-1 font-normal text-ink-2">{club.data.secondaryName}</span>
-              )}
-            </h1>
-            <SourceBadge handle={handle} />
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              aria-hidden="true"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent font-display text-lg font-bold text-bg"
+            >
+              {monogram(club.data?.primaryName ?? 'SportFlow')}
+            </span>
+            <div className="min-w-0">
+              <h1 className="truncate font-display text-lg font-bold uppercase leading-tight tracking-wide">
+                {club.data?.primaryName ?? 'SportFlow'}
+              </h1>
+              <div className="flex min-w-0 items-center gap-2">
+                {club.data?.secondaryName && (
+                  <span className="truncate text-xs text-on-header-2">{club.data.secondaryName}</span>
+                )}
+                <SourceBadge handle={handle} />
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center gap-1">
@@ -53,7 +63,7 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
               type="button"
               onClick={cycle}
               aria-label={`Tema: ${THEME_LABEL[mode]}`}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-ink-2 transition hover:text-ink"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-on-header-2 transition hover:text-on-header"
             >
               <ThemeIcon mode={mode} />
             </button>
@@ -61,7 +71,7 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
               <button
                 type="button"
                 onClick={signOutUser}
-                className="px-2 text-xs text-ink-2 underline-offset-2 hover:underline"
+                className="min-h-11 px-2 text-xs text-on-header-2 underline-offset-2 hover:underline"
               >
                 Çıkış
               </button>
@@ -102,13 +112,19 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
                   type="button"
                   onClick={() => setTab(item.id)}
                   aria-current={active ? 'page' : undefined}
-                  className={`relative flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 transition ${
-                    active ? 'text-brand' : 'text-ink-3'
+                  className={`relative flex min-h-16 flex-1 flex-col items-center justify-center gap-0.5 transition ${
+                    active ? 'text-brand' : 'text-ink-2'
                   }`}
                 >
-                  {active && <span className="absolute inset-x-0 top-0 h-0.5 bg-brand" />}
-                  <TabIcon id={item.id} />
-                  <span className="text-[11px] font-medium">{item.label}</span>
+                  {active && <span className="absolute inset-x-5 top-0 h-[3px] rounded-b-full bg-accent" />}
+                  <span
+                    className={`flex h-8 w-14 items-center justify-center rounded-full transition ${
+                      active ? 'bg-brand/12' : ''
+                    }`}
+                  >
+                    <TabIcon id={item.id} />
+                  </span>
+                  <span className={`text-[11px] ${active ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
                 </button>
               )
             })}
@@ -117,6 +133,17 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
       )}
     </div>
   )
+}
+
+/** Kulüp adından baş harf rozeti: ilk iki kelimenin baş harfleri. */
+function monogram(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word.charAt(0))
+    .join('')
+    .toLocaleUpperCase('tr-TR')
 }
 
 const iconProps = {
@@ -193,14 +220,14 @@ function ThemeIcon({ mode }: { mode: ThemeMode }) {
 function SourceBadge({ handle }: { handle: DataSourceHandle }) {
   if (handle.kind === 'mock') {
     return (
-      <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-2">
+      <span className="shrink-0 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink-2">
         demo veri
       </span>
     )
   }
   return (
     <span
-      className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+      className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
         handle.writable ? 'bg-present-soft text-present' : 'bg-late-soft text-late'
       }`}
     >

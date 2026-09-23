@@ -1,15 +1,20 @@
 import type { SessionSummary } from '../../domain/types'
 import { dayLabel } from './date'
 
-const PARTS: { key: keyof SessionSummary['counts']; label: string; bar: string }[] = [
-  { key: 'present', label: 'var', bar: 'bg-present' },
-  { key: 'late', label: 'geç', bar: 'bg-late' },
-  { key: 'excused', label: 'izinli', bar: 'bg-excused' },
-  { key: 'absent', label: 'yok', bar: 'bg-absent' },
+const PARTS: { key: keyof SessionSummary['counts']; label: string; bar: string; text: string }[] = [
+  { key: 'present', label: 'var', bar: 'bg-present', text: 'text-present' },
+  { key: 'late', label: 'geç', bar: 'bg-late', text: 'text-late' },
+  { key: 'excused', label: 'izinli', bar: 'bg-excused', text: 'text-excused' },
+  { key: 'absent', label: 'yok', bar: 'bg-absent', text: 'text-absent' },
 ]
 
-const shortDate = (iso: string) =>
-  new Date(`${iso}T12:00:00`).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })
+const dayNumber = (iso: string) => new Date(`${iso}T12:00:00`).getDate()
+const monthShort = (iso: string) =>
+  new Date(`${iso}T12:00:00`).toLocaleDateString('tr-TR', { month: 'short' })
+
+/** Katılım oranı rengi: yüksek yeşil, orta turuncu, düşük kırmızı. */
+const rateTone = (rate: number) =>
+  rate >= 75 ? 'text-present' : rate >= 50 ? 'text-late' : 'text-absent'
 
 /** Geçmiş oturumlar: tıklayınca o güne dönülür ve yoklama düzeltilebilir. */
 export function SessionHistory({
@@ -31,9 +36,14 @@ export function SessionHistory({
 
   return (
     <section className="space-y-3">
-      <div className="flex items-baseline justify-between">
-        <h2 className="font-display text-base font-semibold">Kayıtlı yoklamalar</h2>
-        <span className="text-xs text-ink-3">düzeltmek için tarihe dokun</span>
+      <div>
+        <h2 className="font-display text-xl font-bold tracking-tight">
+          Kayıtlı yoklamalar
+          <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 align-middle text-xs font-bold text-accent">
+            {history.length}
+          </span>
+        </h2>
+        <p className="text-xs font-medium text-ink-2">Düzeltmek için tarihe dokun</p>
       </div>
 
       <ul className="space-y-2">
@@ -49,19 +59,33 @@ export function SessionHistory({
               <button
                 type="button"
                 onClick={() => onPick(summary.date)}
-                className={`w-full rounded-[20px] border border-line bg-surface p-4 text-left transition hover:opacity-90 ${
-                  active ? 'ring-2 ring-brand' : ''
+                className={`w-full rounded-[20px] border border-line bg-surface p-3 text-left transition hover:opacity-90 ${
+                  active ? 'ring-2 ring-accent' : ''
                 }`}
               >
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="font-medium">
-                    {dayLabel(summary.date)}
-                    <span className="ml-2 text-xs text-ink-3">{shortDate(summary.date)}</span>
+                <div className="flex items-center gap-3">
+                  <span className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-2xl bg-header leading-none text-on-header">
+                    <span className="font-display text-lg font-bold">{dayNumber(summary.date)}</span>
+                    <span className="text-[10px] font-semibold uppercase text-on-header-2">
+                      {monthShort(summary.date)}
+                    </span>
                   </span>
-                  <span className="font-display text-2xl font-semibold tabular-nums">%{rate}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold">{dayLabel(summary.date)}</span>
+                    <span className="mt-1 flex gap-2 text-xs font-semibold">
+                      {parts.map((part) => (
+                        <span key={part.key} className={part.text}>
+                          {`${summary.counts[part.key]} ${part.label}`}
+                        </span>
+                      ))}
+                    </span>
+                  </span>
+                  <span className={`font-display text-2xl font-bold tabular-nums ${rateTone(rate)}`}>
+                    %{rate}
+                  </span>
                 </div>
 
-                <div className="mt-3 flex h-1.5 overflow-hidden rounded-full bg-surface-2">
+                <div className="mt-3 flex h-2 gap-0.5 overflow-hidden rounded-full bg-surface-2">
                   {parts.map((part) => (
                     <span
                       key={part.key}
@@ -70,10 +94,6 @@ export function SessionHistory({
                     />
                   ))}
                 </div>
-
-                <p className="mt-2 text-xs text-ink-2">
-                  {parts.map((part) => `${summary.counts[part.key]} ${part.label}`).join(' · ')}
-                </p>
               </button>
             </li>
           )
