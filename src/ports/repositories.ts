@@ -3,6 +3,7 @@ import type {
   AttendanceStatus,
   Branch,
   ClubIdentity,
+  ClubSettings,
   Group,
   Id,
   Player,
@@ -14,12 +15,14 @@ import type {
 export interface SchoolRepository {
   list(): Promise<School[]>
   create(input: Omit<School, 'id'>): Promise<School>
+  /** Okulu kullanan grupların schoolId'si temizlenir; gruplar silinmez. */
   remove(id: Id): Promise<void>
 }
 
 export interface BranchRepository {
   list(): Promise<Branch[]>
   create(input: Omit<Branch, 'id'>): Promise<Branch>
+  /** Grup kullanıyorsa in_use ("N grup bu branşı kullanıyor") ile reddedilir. */
   remove(id: Id): Promise<void>
 }
 
@@ -68,6 +71,9 @@ export interface AttendanceRepository {
 export interface SettingsRepository {
   /** Kulüp adı ve alt başlık — giriş ekranı ve başlık buradan beslenir. */
   clubIdentity(): Promise<ClubIdentity>
+  /** Alan anahtarları; kapalı alan gizlenir, verisi silinmez. */
+  get(): Promise<ClubSettings>
+  update(patch: { fields?: Partial<ClubSettings['fields']> }): Promise<ClubSettings>
 }
 
 export interface DataSource {

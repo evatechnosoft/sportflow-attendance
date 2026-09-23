@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  UNASSIGNED_SCHOOL,
   fromAttendanceStatus,
   sessionDocId,
   toAttendanceStatus,
@@ -68,8 +67,8 @@ describe('toGroup', () => {
     expect(toGroup('g1', { name: 'U14', startTime: '17:00' }).schedule).toEqual([])
   })
 
-  it('okulu olmayan eski grup "atanmamış okul"a düşer', () => {
-    expect(toGroup('g1', { name: 'U14' }).schoolId).toBe(UNASSIGNED_SCHOOL)
+  it('okulu olmayan eski grubun okulu yoktur', () => {
+    expect(toGroup('g1', { name: 'U14' }).schoolId).toBeUndefined()
   })
 
   it('okul alanı varsa korunur', () => {
@@ -158,8 +157,7 @@ describe('schoolsFromGroups', () => {
       toGroup('g2', { name: 'B', schoolId: 'okul-1' }),
       toGroup('g3', { name: 'C' }),
     ]
-    const schools = schoolsFromGroups(groups)
-    expect(schools).toHaveLength(2)
-    expect(schools.find((school) => school.id === UNASSIGNED_SCHOOL)?.name).toBe('Okul atanmamış')
+    // Okulsuz grup sahte "atanmamış" okul üretmez.
+    expect(schoolsFromGroups(groups)).toEqual([{ id: 'okul-1', name: 'okul-1' }])
   })
 })

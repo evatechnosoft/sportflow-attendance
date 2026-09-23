@@ -1,12 +1,21 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDataSource } from '../../app/dataSource'
+import { Sheet } from '../../app/Sheet'
 import { DomainError } from '../../domain/errors'
-import type { Id, ScheduleSlot } from '../../domain/types'
+import { DEFAULT_CLUB_SETTINGS, type Id, type ScheduleSlot } from '../../domain/types'
 import { WEEKDAY_LABEL } from '../attendance/date'
+import { joinParts } from '../attendance/useGroupOptions'
 import { addSlot, hasSlotOn, removeSlot, scheduleLabel } from './schedule'
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7]
+
+/** Silme onayı bekleyen kayıt. */
+interface PendingRemove {
+  kind: 'school' | 'branch'
+  id: Id
+  name: string
+}
 
 const slugify = (value: string) =>
   value
@@ -19,10 +28,13 @@ export function ManageScreen() {
   const db = useDataSource()
   const queryClient = useQueryClient()
   const [error, setError] = useState('')
+  const [pendingRemove, setPendingRemove] = useState<PendingRemove | null>(null)
 
   const schools = useQuery({ queryKey: ['schools'], queryFn: () => db.schools.list() })
   const branches = useQuery({ queryKey: ['branches'], queryFn: () => db.branches.list() })
   const groups = useQuery({ queryKey: ['groups'], queryFn: () => db.groups.list() })
+  const settings = useQuery({ queryKey: ['club-settings'], queryFn: () => db.settings.get() })
+  const showSchool = (settings.data ?? DEFAULT_CLUB_SETTINGS).fields.school
 
   const refresh = () => {
     setError('')
@@ -42,10 +54,28 @@ export function ManageScreen() {
     onSuccess: refresh,
     onError: fail,
   })
+  const toggleSchool = useMutation({
+    mutationFn: (school: boolean) => db.settings.update({ fields: { school } }),
+    onSuccess: refresh,
+    onError: fail,
+  })
+  // Hata onay sayfasında gösterilir; başarıda sayfa kapanır.
+  const remove = useMutation({
+    mutationFn: (target: PendingRemove) =>
+      target.kind === 'school' ? db.schools.remove(target.id) : db.branches.remove(target.id),
+    onSuccess: () => {
+      refresh()
+      setPendingRemove(null)
+    },
+  })
+  const closeRemove = () => {
+    setPendingRemove(null)
+    remove.reset()
+  }
   const addGroup = useMutation({
     mutationFn: (input: {
       name: string
-      schoolId: string
+      schoolId?: string
       branchId: string
       schedule: ScheduleSlot[]
     }) => db.groups.create(input),
@@ -63,25 +93,50 @@ export function ManageScreen() {
     <section className="space-y-4">
       <div className="flex h-14 flex-col justify-center">
         <h2 className="font-display text-2xl font-bold tracking-tight">Tanımlar</h2>
-        <p className="text-xs font-medium text-ink-2">Okul, branş ve grupların antrenman günleri</p>
+        <p className="text-xs font-medium text-ink-2">Alanlar, branşlar ve grupların antrenman günleri</p>
       </div>
 
       {error && (
         <p className="rounded-xl bg-absent-soft px-4 py-2 text-sm text-absent">{error}</p>
       )}
 
-      <Card title="Okullar" count={schools.data?.length}>
-        <NameForm placeholder="Okul adı" onSubmit={(name) => addSchool.mutate(name)} />
-        <Chips items={schools.data?.map((row) => row.name) ?? []} />
+      <Card title="Alanlar">
+        <FieldSwitch
+          label="Okul"
+          hint="Kapalıyken okul hiçbir ekranda görünmez; kayıtlar silinmez."
+          checked={showSchool}
+          busy={toggleSchool.isPending}
+          onChange={(value) => toggleSchool.mutate(value)}
+        />
       </Card>
+
+      {showSchool && (
+        <Card title="Okullar" count={schools.data?.length}>
+          <NameForm placeholder="Okul adı" onSubmit={(name) => addSchool.mutate(name)} />
+          <Chips
+            items={schools.data?.map((row) => ({ id: row.id, name: row.name, label: row.name })) ?? []}
+            onRemove={(item) => setPendingRemove({ kind: 'school', ...item })}
+          />
+        </Card>
+      )}
 
       <Card title="Branşlar" count={branches.data?.length}>
         <NameForm placeholder="Branş adı" onSubmit={(name) => addBranch.mutate(name)} />
-        <Chips items={branches.data?.map((row) => `${row.name} (${row.slug})`) ?? []} />
+        <Chips
+          items={
+            branches.data?.map((row) => ({
+              id: row.id,
+              name: row.name,
+              label: `${row.name} (${row.slug})`,
+            })) ?? []
+          }
+          onRemove={(item) => setPendingRemove({ kind: 'branch', ...item })}
+        />
       </Card>
 
       <Card title="Gruplar" count={groups.data?.length}>
         <GroupForm
+          showSchool={showSchool}
           schools={schools.data ?? []}
           branches={branches.data ?? []}
           onSubmit={(input) => addGroup.mutate(input)}
@@ -95,7 +150,7 @@ export function ManageScreen() {
                 <div className="flex justify-between gap-2">
                   <span className="font-semibold">{group.name}</span>
                   <span className="min-w-0 truncate text-ink-2">
-                    {school?.name ?? '—'} · {branch?.name ?? '—'}
+                    {joinParts(showSchool ? school?.name : undefined, branch?.name)}
                   </span>
                 </div>
                 <ScheduleRow
@@ -108,7 +163,81 @@ export function ManageScreen() {
           })}
         </ul>
       </Card>
+
+      <Sheet open={pendingRemove !== null} onClose={closeRemove}>
+        <p className="mb-1 font-display text-lg font-bold">{`${pendingRemove?.name ?? ''} silinsin mi?`}</p>
+        <p className="mb-4 text-sm text-ink-2">
+          {pendingRemove?.kind === 'school'
+            ? 'Bu okulu kullanan gruplar okulsuz kalır.'
+            : 'Grup kullanıyorsa branş silinmez.'}
+        </p>
+        {remove.error && (
+          <p role="alert" className="mb-3 rounded-xl bg-absent-soft px-4 py-2 text-sm font-medium text-absent">
+            {remove.error instanceof DomainError ? remove.error.message : 'Beklenmeyen hata'}
+          </p>
+        )}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={closeRemove}
+            className="min-h-11 flex-1 rounded-2xl bg-surface-2 text-sm font-medium text-ink-2"
+          >
+            Vazgeç
+          </button>
+          <button
+            type="button"
+            disabled={remove.isPending}
+            onClick={() => pendingRemove && remove.mutate(pendingRemove)}
+            className="min-h-11 flex-1 rounded-2xl bg-absent text-sm font-bold text-bg disabled:opacity-40"
+          >
+            Sil
+          </button>
+        </div>
+      </Sheet>
     </section>
+  )
+}
+
+/** Erişilebilir aç/kapa anahtarı; tüm satır dokunma hedefidir. */
+function FieldSwitch({
+  label,
+  hint,
+  checked,
+  busy,
+  onChange,
+}: {
+  label: string
+  hint: string
+  checked: boolean
+  busy: boolean
+  onChange: (value: boolean) => void
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={busy}
+      onClick={() => onChange(!checked)}
+      className="flex min-h-11 w-full items-center gap-3 text-left disabled:opacity-60"
+    >
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold">{label}</span>
+        <span className="block text-xs text-ink-2">{hint}</span>
+      </span>
+      <span
+        aria-hidden="true"
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+          checked ? 'bg-accent' : 'bg-line'
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 h-6 w-6 rounded-full bg-surface shadow-sm transition-[left] ${
+            checked ? 'left-[22px]' : 'left-0.5'
+          }`}
+        />
+      </span>
+    </button>
   )
 }
 
@@ -128,9 +257,11 @@ function Card({
           <span aria-hidden="true" className="h-5 w-1.5 rounded-full bg-accent" />
           {title}
         </h3>
-        <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-semibold text-ink-2">
-          {count ?? 0} kayıt
-        </span>
+        {count !== undefined && (
+          <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-semibold text-ink-2">
+            {count} kayıt
+          </span>
+        )}
       </div>
       {children}
     </div>
@@ -168,15 +299,17 @@ function NameForm({
 }
 
 function GroupForm({
+  showSchool,
   schools,
   branches,
   onSubmit,
 }: {
+  showSchool: boolean
   schools: { id: string; name: string }[]
   branches: { id: string; name: string }[]
   onSubmit: (input: {
     name: string
-    schoolId: string
+    schoolId?: string
     branchId: string
     schedule: ScheduleSlot[]
   }) => void
@@ -188,8 +321,13 @@ function GroupForm({
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
-    if (!name.trim() || !schoolId || !branchId) return
-    onSubmit({ name: name.trim(), schoolId, branchId, schedule })
+    if (!name.trim() || !branchId) return
+    onSubmit({
+      name: name.trim(),
+      schoolId: showSchool && schoolId ? schoolId : undefined,
+      branchId,
+      schedule,
+    })
     setName('')
     setSchedule([])
   }
@@ -203,24 +341,28 @@ function GroupForm({
         aria-label="Grup adı"
         className="min-h-11 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm sm:col-span-2"
       />
-      <select
-        value={schoolId}
-        onChange={(event) => setSchoolId(event.target.value)}
-        aria-label="Okul"
-        className="min-h-11 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
-      >
-        <option value="">Okul seç</option>
-        {schools.map((school) => (
-          <option key={school.id} value={school.id}>
-            {school.name}
-          </option>
-        ))}
-      </select>
+      {showSchool && (
+        <select
+          value={schoolId}
+          onChange={(event) => setSchoolId(event.target.value)}
+          aria-label="Okul"
+          className="min-h-11 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
+        >
+          <option value="">Okul yok</option>
+          {schools.map((school) => (
+            <option key={school.id} value={school.id}>
+              {school.name}
+            </option>
+          ))}
+        </select>
+      )}
       <select
         value={branchId}
         onChange={(event) => setBranchId(event.target.value)}
         aria-label="Branş"
-        className="min-h-11 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
+        className={`min-h-11 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm ${
+          showSchool ? '' : 'sm:col-span-2'
+        }`}
       >
         <option value="">Branş seç</option>
         {branches.map((branch) => (
@@ -242,12 +384,32 @@ function GroupForm({
   )
 }
 
-function Chips({ items }: { items: string[] }) {
+function Chips({
+  items,
+  onRemove,
+}: {
+  items: { id: Id; name: string; label: string }[]
+  onRemove: (item: { id: Id; name: string }) => void
+}) {
   return (
     <div className="mt-3 flex flex-wrap gap-2">
       {items.map((item) => (
-        <span key={item} className="rounded-full border border-line bg-surface-2 px-3 py-1 text-xs font-medium text-ink">
-          {item}
+        <span
+          key={item.id}
+          className="flex min-h-11 items-center rounded-full border border-line bg-surface-2 pl-3 text-xs font-medium text-ink"
+        >
+          {item.label}
+          <button
+            type="button"
+            aria-label={`${item.name} sil`}
+            onClick={() => onRemove({ id: item.id, name: item.name })}
+            className="flex h-11 w-11 items-center justify-center rounded-full text-ink-2 hover:text-absent"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+              strokeLinecap="round" aria-hidden="true" className="h-4 w-4">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
         </span>
       ))}
     </div>

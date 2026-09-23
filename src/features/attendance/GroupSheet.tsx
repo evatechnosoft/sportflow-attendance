@@ -1,5 +1,5 @@
 import { useDialog } from '../../app/useDialog'
-import type { GroupOption } from './useGroupOptions'
+import { joinParts, type GroupOption } from './useGroupOptions'
 
 /** Grup seçimi için alttan açılan yerel <dialog>. */
 export function GroupSheet({
@@ -40,7 +40,7 @@ export function GroupSheet({
             >
               <span className="truncate font-medium">{group.label}</span>
               <span className="ml-3 shrink-0 truncate text-xs opacity-70">
-                {group.scheduleText || `${group.schoolName} · ${group.branchName}`}
+                {group.scheduleText || joinParts(group.schoolName, group.branchName)}
               </span>
             </button>
           ))}

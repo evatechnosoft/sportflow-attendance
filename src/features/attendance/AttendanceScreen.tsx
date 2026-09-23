@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDataSource } from '../../app/dataSource'
 import { useSelection } from '../../app/selection'
 import type { AttendanceStatus } from '../../domain/types'
-import { useGroupOptions } from './useGroupOptions'
+import { joinParts, useGroupOptions } from './useGroupOptions'
 import { AttendanceRow } from './AttendanceRow'
 import { GroupSheet } from './GroupSheet'
 import { dayLabel, shiftDay, shortDate, weekdayOf, WEEKDAY_LABEL } from './date'
@@ -165,8 +165,7 @@ export function AttendanceScreen() {
           </span>
           {selected && (
             <span className="block truncate text-xs font-medium text-ink-2">
-              {selected.schoolName} · {selected.branchName}
-              {selected.scheduleText && ` · ${selected.scheduleText}`}
+              {joinParts(selected.schoolName, selected.branchName, selected.scheduleText)}
             </span>
           )}
         </span>

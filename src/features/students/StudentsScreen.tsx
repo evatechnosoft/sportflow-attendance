@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDataSource } from '../../app/dataSource'
 import { useSelection } from '../../app/selection'
-import { useDialog } from '../../app/useDialog'
+import { Sheet } from '../../app/Sheet'
 import { DomainError } from '../../domain/errors'
 import type { Id, Player } from '../../domain/types'
 import { GroupSheet } from '../attendance/GroupSheet'
-import { useGroupOptions } from '../attendance/useGroupOptions'
+import { joinParts, useGroupOptions } from '../attendance/useGroupOptions'
 import { todayIso } from '../attendance/date'
 import { avatarTone, initials } from '../attendance/avatar'
 import {
@@ -133,7 +133,7 @@ export function StudentsScreen() {
           </span>
           {selected && (
             <span className="block truncate text-xs font-medium text-ink-2">
-              {selected.schoolName} · {selected.branchName}
+              {joinParts(selected.schoolName, selected.branchName)}
             </span>
           )}
         </span>
@@ -429,25 +429,5 @@ function ConfirmSheet({
         </button>
       </div>
     </Sheet>
-  )
-}
-
-/** GroupSheet ile aynı yerel <dialog> kabuğu; içeriği çağıran belirler. */
-function Sheet({
-  open,
-  onClose,
-  children,
-}: {
-  open: boolean
-  onClose: () => void
-  children: ReactNode
-}) {
-  const ref = useDialog(open)
-  return (
-    <dialog ref={ref} className="sheet" onClose={onClose} onClick={onClose}>
-      <div className="rounded-t-[26px] bg-surface p-4" onClick={(event) => event.stopPropagation()}>
-        {children}
-      </div>
-    </dialog>
   )
 }

@@ -134,6 +134,40 @@ export function runDataSourceContract(name: string, makeDataSource: () => DataSo
       })
     })
 
+    describe('A5 isteğe bağlı okul ve silme', () => {
+      it('okulsuz grup açılır', async () => {
+        const branch = await db.branches.create({ name: 'Hentbol', slug: 'hentbol' })
+        const group = await db.groups.create({ name: 'U10', branchId: branch.id, schedule: [] })
+        expect(group.schoolId).toBeUndefined()
+        expect((await db.groups.list())[0].schoolId).toBeUndefined()
+      })
+
+      it('okul silinince onu kullanan grupların okulu temizlenir', async () => {
+        const group = await seedGroup()
+        await db.schools.remove(group.schoolId!)
+        expect(await db.schools.list()).toHaveLength(0)
+        const [after] = await db.groups.list()
+        expect(after.id).toBe(group.id)
+        expect(after.schoolId).toBeUndefined()
+      })
+
+      it('grup kullanan branş silinmez, kaç grubun kullandığı söylenir', async () => {
+        const group = await seedGroup()
+        await db.groups.create({ name: 'U16', branchId: group.branchId, schedule: [] })
+        await expect(db.branches.remove(group.branchId)).rejects.toMatchObject({
+          code: 'in_use',
+          message: '2 grup bu branşı kullanıyor',
+        })
+        expect(await db.branches.list()).toHaveLength(1)
+      })
+
+      it('kullanılmayan branş silinir', async () => {
+        const branch = await db.branches.create({ name: 'Tenis', slug: 'tenis' })
+        await db.branches.remove(branch.id)
+        expect(await db.branches.list()).toHaveLength(0)
+      })
+    })
+
     describe('US-3 oyuncu', () => {
       it('olmayan gruba oyuncu eklenemez', async () => {
         await expect(
@@ -252,6 +286,18 @@ export function runDataSourceContract(name: string, makeDataSource: () => DataSo
       it('boş olmayan bir kulüp adı döner', async () => {
         const identity = await db.settings.clubIdentity()
         expect(identity.primaryName.trim().length).toBeGreaterThan(0)
+      })
+    })
+
+    describe('A5 alan anahtarı', () => {
+      it('okul alanı varsayılan açıktır', async () => {
+        expect((await db.settings.get()).fields.school).toBe(true)
+      })
+
+      it('okul alanı kapatılır ve kalıcıdır', async () => {
+        const updated = await db.settings.update({ fields: { school: false } })
+        expect(updated.fields.school).toBe(false)
+        expect((await db.settings.get()).fields.school).toBe(false)
       })
     })
 
