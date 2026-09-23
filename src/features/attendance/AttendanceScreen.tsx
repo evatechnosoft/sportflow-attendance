@@ -239,10 +239,10 @@ export function AttendanceScreen() {
       {/* 3. Yığılmış ilerleme + durum çipleri */}
       <div className="py-4">
         <div className="mb-2 flex items-baseline justify-between gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-ink-2">Katılım</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-ink-2">Yoklama</span>
           <span className="font-display text-sm font-bold tabular-nums text-ink">
-            {summary.marked}/{summary.total}
-            {summary.rate !== null && ` · %${summary.rate}`}
+            {summary.marked}/{summary.total} işaretli
+            {summary.rate !== null && ` · %${summary.rate} katılım`}
           </span>
         </div>
         <div className="flex h-3 gap-0.5 overflow-hidden rounded-full bg-surface-2">
