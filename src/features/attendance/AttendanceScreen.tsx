@@ -6,7 +6,8 @@ import type { AttendanceStatus } from '../../domain/types'
 import { useGroupOptions } from './useGroupOptions'
 import { AttendanceRow } from './AttendanceRow'
 import { GroupSheet } from './GroupSheet'
-import { dayLabel, shiftDay, shortDate } from './date'
+import { dayLabel, shiftDay, shortDate, weekdayOf, WEEKDAY_LABEL } from './date'
+import { hasSlotOn } from '../manage/schedule'
 import { isDirty, marksFromRows, STATUSES, STATUS_LABEL, summarize, type Marks } from './summary'
 
 const SEGMENT: Record<AttendanceStatus, string> = {
@@ -86,6 +87,9 @@ export function AttendanceScreen() {
   )
 
   const selected = groups.data?.find((group) => group.id === groupId)
+  // Kural 4-5: takvimi tanımlı grupta, o güne slot yoksa uyar — kaydetmeyi engelleme.
+  const offDay =
+    selected && selected.schedule.length > 0 && !hasSlotOn(selected.schedule, weekdayOf(date))
   const savedMarks = useMemo(() => marksFromRows(saved.data ?? []), [saved.data])
   const alreadySaved = (saved.data?.length ?? 0) > 0
   const dirty = isDirty(marks, savedMarks)
@@ -124,6 +128,7 @@ export function AttendanceScreen() {
           {selected && (
             <span className="block truncate text-xs text-ink-2">
               {selected.schoolName} · {selected.branchName}
+              {selected.scheduleText && ` · ${selected.scheduleText}`}
             </span>
           )}
         </span>
@@ -210,6 +215,12 @@ export function AttendanceScreen() {
           </span>
         </div>
       </div>
+
+      {offDay && (
+        <p className="mb-2 rounded-2xl bg-late-soft px-4 py-2 text-sm text-late">
+          {`Bu grubun ${WEEKDAY_LABEL[weekdayOf(date)]} antrenmanı yok`}
+        </p>
+      )}
 
       {/* 4-5. Liste ve boş/hata durumları */}
       {failure && (

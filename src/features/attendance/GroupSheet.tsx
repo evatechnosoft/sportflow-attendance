@@ -40,7 +40,7 @@ export function GroupSheet({
             >
               <span className="truncate font-medium">{group.label}</span>
               <span className="ml-3 shrink-0 truncate text-xs opacity-70">
-                {group.schoolName} · {group.branchName}
+                {group.scheduleText || `${group.schoolName} · ${group.branchName}`}
               </span>
             </button>
           ))}

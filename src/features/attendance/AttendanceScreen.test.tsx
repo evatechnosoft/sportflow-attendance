@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AttendanceScreen } from './AttendanceScreen'
@@ -7,8 +7,13 @@ import { DataSourceProvider } from '../../app/dataSource'
 import { SelectionProvider } from '../../app/selection'
 import { createMockDataSource } from '../../adapters/mock/mockDataSource'
 import type { DataSource } from '../../ports/repositories'
+import type { ScheduleSlot } from '../../domain/types'
+import { todayIso, weekdayOf, WEEKDAY_LABEL } from './date'
 
-async function setup() {
+/** Bugünün dışındaki bir ISO gün — takvimi olan ama bugün toplanmayan grup için. */
+const otherWeekday = () => (weekdayOf(todayIso()) % 7) + 1
+
+async function setup(schedule: ScheduleSlot[] = []) {
   const db: DataSource = createMockDataSource()
   const school = await db.schools.create({ name: 'Atatürk Ortaokulu' })
   const branch = await db.branches.create({ name: 'Voleybol', slug: 'voleybol' })
@@ -17,7 +22,7 @@ async function setup() {
     schoolId: school.id,
     branchId: branch.id,
     coachName: 'Elif Kaya',
-    schedule: [],
+    schedule,
   })
   const spell = [{ groupId: group.id, joinedOn: '2026-09-01' }]
   await db.players.create({
@@ -57,6 +62,8 @@ async function mark(user: ReturnType<typeof userEvent.setup>, name: string, labe
 }
 
 describe('AttendanceScreen', () => {
+  afterEach(cleanup)
+
   it('grubun aktif oyuncularını listeler ve işaretlemeyi kaydeder', async () => {
     const user = userEvent.setup({ delay: null })
     const { db, group } = await setup()
@@ -86,5 +93,26 @@ describe('AttendanceScreen', () => {
     await screen.findByText('Can Erdoğan')
     expect(screen.getByText('henüz işaretlenmedi')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Kaydet/ })).toBeNull()
+  })
+
+  it('antrenman günü olmayan tarihte uyarı çıkar, kaydetme engellenmez', async () => {
+    const user = userEvent.setup({ delay: null })
+    const day = otherWeekday()
+    await setup([{ weekday: day, startTime: '17:00', durationMinutes: 90 }])
+
+    await screen.findByText(`Bu grubun ${WEEKDAY_LABEL[weekdayOf(todayIso())]} antrenmanı yok`)
+    await screen.findByText('Can Erdoğan')
+    // Takvim özeti başlıkta ve grup seçicide görünür.
+    expect(screen.getAllByText(new RegExp(`${WEEKDAY_LABEL[day]} 17:00`)).length).toBeGreaterThan(0)
+
+    await mark(user, 'Can Erdoğan', 'Var')
+    expect(screen.getByRole('button', { name: /Kaydet/ })).toBeTruthy()
+  })
+
+  it('takvimi tanımlı olmayan grupta uyarı çıkmaz', async () => {
+    await setup()
+
+    await screen.findByText('Can Erdoğan')
+    expect(screen.queryByText(/antrenmanı yok/)).toBeNull()
   })
 })
