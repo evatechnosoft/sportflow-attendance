@@ -689,3 +689,199 @@ Faz A onaylanmadan detaylandırılmaz. Bugünden bilinenler:
   SportFlow grup listesini dışa mı verecek?
 - `customFields` Firestore'da süzülebilir mi: alan başına index gerekir; hangi
   alanların süzülebilir olacağı şablonda işaretlenmeli.
+
+---
+
+## Faz A2 — Grup takvimi (antrenman günleri)
+
+> 2026-09-23 · Faz A yayına alındıktan sonra açıldı.
+
+### Neden
+
+`Group.schedule: ScheduleSlot[]` tipi var (`domain/types.ts:19-26`) ama **hiçbir
+yerde girilmiyor**: `ManageScreen.tsx:42` grubu `schedule: []` ile açıyor,
+yoklama ekranı `schedule`'a hiç bakmıyor. Sonuç: her tarihte aynı liste.
+Ayrıca `mapping.ts:82` canlıdan okurken `weekday: 0` yazıyor — ISO-8601'de
+geçerli aralık 1-7, bu **uydurma bir değer**; canlı `groups` belgelerinde gün
+bilgisi yok, yalnız saat var.
+
+### Kararlar [Dean, 2026-09-23]
+
+- **Grubun günleri tanımlı olur ve girilebilir.** Bir grup birden çok gün
+  toplanabilir (ör. Salı 17:00 + Cumartesi 10:00).
+- **Hafta içi / hafta sonu ayrı grup olarak açılır** — bugünkü model bunu zaten
+  kaldırıyor. Sporcu bazında gün ataması **yok**; grubun listesi her gün aynıdır.
+- **Antrenman olmayan günde uyarılır, engellenmez.** Telafi antrenmanı gerçek;
+  koç yine yoklama alabilmeli. (Bu, `docs/spec.md` US-1'deki "oturumu olmayan
+  gün için yoklama alınamaz" maddesini gevşetir — spec oraya not düşülür.)
+- **Sahte `weekday: 0` kaldırılır.** Gün bilgisi olmayan canlı grup `schedule: []`
+  ile gelir; uydurma gün üretilmez.
+
+### Kurallar
+
+1. `ScheduleSlot.weekday` 1-7 (ISO-8601, 1 = Pazartesi). Aralık dışı değer
+   kabul edilmez.
+2. Bir grubun aynı gün + aynı saat için iki slotu olamaz.
+3. `schedule` boş olabilir — gün tanımlanmamış grup geçerlidir, yalnız uyarı
+   göstermez.
+4. Yoklama ekranında seçili tarihin günü grubun hiçbir slotuna denk gelmiyorsa
+   uyarı şeridi çıkar: "Bu grubun <gün> antrenmanı yok". Kaydetme engellenmez.
+5. `schedule` boş grupta uyarı **çıkmaz** (bilgi yok, yanlış uyarı üretme).
+
+### Dosyalar
+
+| Dosya | Sorumluluk |
+|---|---|
+| `src/features/attendance/date.ts` (değişir) | `weekdayOf(iso)` → 1-7, `WEEKDAY_LABEL` |
+| `src/features/attendance/date.test.ts` (değişir) | yukarıdakinin testi |
+| `src/features/manage/schedule.ts` (yeni) | `scheduleLabel(slots)`, `addSlot`, `hasSlotOn` — saf |
+| `src/features/manage/schedule.test.ts` (yeni) | testi |
+| `src/ports/repositories.ts` (değişir) | `GroupRepository.update(id, patch)` |
+| `src/adapters/mock/mockDataSource.ts` (değişir) | `groups.update` + slot doğrulama |
+| `src/adapters/firestore/firestoreDataSource.ts` (değişir) | `groups.update` → `readOnly()` |
+| `src/adapters/firestore/mapping.ts:82` (değişir) | sahte `weekday: 0` → `schedule: []` |
+| `src/testing/dataSourceContract.ts` (değişir) | kural 1, 2, 3'ün contract testi |
+| `src/features/manage/ManageScreen.tsx` (değişir) | grup formunda gün+saat, listede özet + düzenleme |
+| `src/features/attendance/AttendanceScreen.tsx` (değişir) | kural 4 uyarı şeridi |
+| `src/features/attendance/useGroupOptions.ts` (değişir) | seçici alt satırında gün/saat özeti |
+
+### Görevler
+
+**Görev 5 — gün yardımcıları.** `weekdayOf` + `scheduleLabel` + `hasSlotOn`,
+saf fonksiyon, önce kırmızı test. `weekdayOf` yerel saat tuzağına düşmemeli:
+`date.ts`'teki `T12:00:00` deseni kullanılır, ham `new Date(iso)` değil.
+Commit: `feat(takvim): gün yardımcıları`.
+
+**Görev 6 — port + adaptör + contract.** `groups.update`, slot doğrulama
+(kural 1-2), `mapping.ts` sahte gün temizliği. Contract testi önce kırmızı.
+`schedule: []` artık `toGroup`'tan dönebilir — `dedupeGroups` anahtarı
+`schedule[0]?.startTime`'a bakıyor (`mapping.ts:147`), boş schedule'da
+tekilleştirmenin bozulmadığı **test edilerek** gösterilmeli.
+Commit: `feat(takvim): groups.update portu ve slot doğrulaması`.
+
+**Görev 7 — ManageScreen gün girişi.** Grup formunda 7 gün toggle + saat +
+süre; grup listesi satırında `scheduleLabel` özeti ve düzenleme. Yeni
+bağımlılık yok, mevcut token'lar. Commit: `feat(takvim): grup gün ve saat girişi`.
+
+**Görev 8 — yoklama uyarısı.** Kural 4-5. Uyarı şeridi `index.css`'teki mevcut
+uyarı deseniyle (`bg-absent-soft` / `text-absent` değil — bu hata rengi; uygun
+bir nötr/uyarı token'ı seç ya da yoksa `bg-surface-2`/`text-ink-2` kullan).
+Seçici alt satırına gün özeti. Commit: `feat(takvim): antrenman olmayan günde uyarı`.
+
+Her görev sonunda `npm test && npx tsc -b && npm run lint` temiz olmadan commit yok.
+Görev 8 sonrası demo yayın tazelenir — bu adım PM'de.
+
+---
+
+## Faz A3 — Çoklu grup üyeliği
+
+> 2026-09-23 · Maç kadrosu kararının ortaya çıkardığı model kusuru.
+
+### Neden
+
+Maç kadrosu ayrı grup olarak açılacak [Dean, 2026-09-23]. Ama bugünkü model bir
+sporcuyu **tek grupta** tutuyor: `Player.groupId` tek değer (`domain/types.ts:50`),
+`currentSpell` yalnız son dönemin açık olmasına bakıyor (`membership.ts`). Sporcu
+maç kadrosuna yazıldığı an normal grubundan düşer, ertesi gün antrenman listesinde
+çıkmaz. Kusur bugün ucuz: kod bu oturumda yazıldı.
+
+### Karar [Dean, 2026-09-23]
+
+**Çoklu üyelik açılır.** `groupHistory` zaten bir dizi; birden çok **açık dönem**
+serbest bırakılır. Sporcu hem "U12" hem "U12 Maç Kadrosu" listesinde görünür,
+ikisinde de yoklaması ayrı alınır.
+
+### Model değişimi
+
+- **`Player.groupId` kaldırılır.** Tek kaynak `groupHistory` olur — aynı bilgiyi
+  iki yerde tutmak er geç çelişir (bu belgenin kendi kuralı, § Faz A Kararlar).
+- **`Player.status` kulüp geneli kalır:** sporcunun hiç açık dönemi yoksa
+  `inactive`, en az bir açık dönemi varsa `active`. Grup bazlı ayrılma dönemin
+  kapanmasıyla ifade edilir.
+- `listByGroup(groupId)` o grupta **açık dönemi olanları** döner;
+  `includeInactive: true` o grupta **kapanmış dönemi olanları** da ekler.
+
+### `membership.ts` yeni imzalar
+
+```ts
+/** Sporcunun o anda açık olan tüm dönemleri. */
+export function openSpells(player: Player): GroupSpell[]
+
+/** Sporcu bu grupta şu an var mı. */
+export function isInGroup(player: Player, groupId: Id): boolean
+
+/** Gruba ekler. Zaten açık dönemi varsa hiçbir şey değişmez. */
+export function joinGroup(player: Player, groupId: Id, on: string): Player
+
+/** Yalnız o grubun dönemini kapatır. Başka açık dönem kalmazsa status inactive olur. */
+export function leaveGroup(player: Player, groupId: Id, on: string): Player
+
+/** Bir gruptan diğerine taşır: kaynağı kapatır, hedefi açar. Diğer üyelikler durur. */
+export function changeGroup(player: Player, fromGroupId: Id, toGroupId: Id, on: string): Player
+```
+
+`rejoinGroup` ayrı fonksiyon olarak **kalkar** — `joinGroup` aynı işi yapıyor
+(kapalı dönemin üstüne yeni açık dönem açmak). İki isim tek davranış tutulmaz.
+
+### Kurallar
+
+1. Aynı grup için aynı anda iki açık dönem olamaz; `joinGroup` zaten üyeyse no-op.
+2. Son açık dönem de kapanınca `status: 'inactive'`; yeni dönem açılınca `'active'`.
+3. `changeGroup` yalnız verilen kaynağı kapatır — sporcunun diğer grupları durur.
+4. Kapanmış dönemler silinmez; geçmiş yoklama okunabilir kalır.
+
+### Dosyalar
+
+`membership.ts` + testi · `domain/types.ts` (`Player.groupId` kalkar) ·
+`mockDataSource.ts` (`players.create`/`update`/`listByGroup`) ·
+`dataSourceContract.ts` · `mapping.ts` (`toPlayer` artık `groupId` yazmaz) ·
+`seed.ts` (en az bir sporcu iki açık dönemli olsun) · `StudentsScreen.tsx`
+(satır menüsü "Gruptan çıkar" + "Başka gruba ekle"; ekran hangi grubu
+listeliyorsa o grup bağlamında çalışır) · Faz A'da yazılan testlerin uyarlanması.
+
+### Görevler
+
+**Görev 9 — `membership.ts` yeni imzalar.** Önce testler kırmızı: kural 1-4.
+Commit: `refactor(sporcu): çoklu grup üyeliği — membership`.
+
+**Görev 10 — model + adaptör + contract.** `Player.groupId` kaldırılır,
+`listByGroup` açık/kapalı döneme göre süzer, `mapping.ts` uyarlanır.
+Contract testi önce kırmızı. Commit: `refactor(sporcu): groupId kalktı, üyelik dizisi tek kaynak`.
+
+**Görev 11 — ekran.** `StudentsScreen` grup bağlamında çalışır; menüde
+"Gruptan çıkar" ve "Başka gruba ekle". Bir sporcunun birden çok grubu varsa
+satırda küçük bir gösterge. Commit: `feat(sporcu): çoklu grup ekranda`.
+
+---
+
+## Faz A4 — Oturum saati kayması
+
+> 2026-09-23 · Okul salonu sınav olunca saat kayıyor [Dean].
+
+### Karar [Dean, 2026-09-23]
+
+Saat değiştirilirken **kullanıcı seçer**: "yalnız bu oturum" ya da "bundan sonra hep".
+
+- *Yalnız bu oturum* → `Session.startTime` değişir, grubun takvimi durur.
+- *Bundan sonra hep* → o güne denk gelen `ScheduleSlot.startTime` güncellenir.
+- Seçili tarih grubun hiçbir slotuna denk gelmiyorsa (takvim dışı ek antrenman)
+  "bundan sonra hep" seçeneği **gösterilmez** — güncellenecek slot yok.
+
+### Gerekenler
+
+- `SessionRepository.update(id, patch: { startTime?: string })` — bugün yalnız
+  `ensure` var ve var olan oturumun saatini **güncellemiyor**
+  (`mockDataSource.ts`: `if (existing) return { ...existing }`).
+- Yoklama ekranı başlığında saat gösterimi + düzenleme sheet'i.
+- "Bundan sonra hep" dalı `groups.update` kullanır (Faz A2'de açılıyor).
+
+### Doğrulanmadı
+
+Canlı `attendance` belgesi `startTime` taşımıyor; `buildAttendanceDoc` beş zorunlu
+alanı yazıyor (`mapping.ts:128-137`) ve kuralların ekstra alana izin verip
+vermediği **bilinmiyor**. Faz B'de kural testiyle doğrulanacak.
+
+### Görev
+
+**Görev 12 — saat düzenleme.** Port + mock + contract + ekran, tek görevde.
+Commit: `feat(takvim): oturum saati düzenleme — bu oturum / bundan sonra`.
