@@ -1,5 +1,13 @@
 import raw from '../../data/players.seed.json'
-import type { Attendance, Branch, Group, Player, School, Session } from '../../domain/types'
+import type {
+  Attendance,
+  Branch,
+  Group,
+  GroupSpell,
+  Player,
+  School,
+  Session,
+} from '../../domain/types'
 import type { MockSeed } from './mockDataSource'
 
 interface RawPlayer {
@@ -20,6 +28,12 @@ const BRANCHES = [
 
 /** Kaç hafta geriye oturum üretilsin. */
 const WEEKS_BACK = 4
+
+/** Demo sezon takvimi: dönem başlangıcı, önceki sezon ve ayrılma tarihi. */
+const SEASON_START = '2026-09-01'
+const PAST_SEASON = '2025-09-01'
+const LEFT_ON = '2026-09-15'
+const SECOND_GROUP_ON = '2026-09-10'
 
 /** Deterministik mock veri: aynı girdi → aynı çıktı, test ve demo tekrar edilebilir olsun. */
 export function buildSeed(today = new Date('2026-09-19')): MockSeed {
@@ -45,17 +59,35 @@ export function buildSeed(today = new Date('2026-09-19')): MockSeed {
     })
   })
 
-  const players: Player[] = (raw as RawPlayer[]).map((row, index) => ({
-    id: `player-${index + 1}`,
-    firstName: row.PlayerName,
-    lastName: row.PlayerLastName,
-    birthDate: row.PlayerBirthDate,
-    gender: row.PlayerGender === 'female' ? 'female' : 'male',
-    groupId: groups[index % groups.length].id,
-    status: index % 17 === 0 ? 'inactive' : 'active',
-    guardianName: row.ParentName,
-    guardianPhone: row.Phone,
-  }))
+  const players: Player[] = (raw as RawPlayer[]).map((row, index) => {
+    const groupId = groups[index % groups.length].id
+    const left = index % 17 === 0
+    // Her 5'te bir sporcu başka bir gruptan gelmiş olsun: ekran geçmişi boş göstermesin.
+    const previousGroupId = index % 5 === 2 ? groups[(index + 1) % groups.length].id : undefined
+    const history: GroupSpell[] = previousGroupId
+      ? [{ groupId: previousGroupId, joinedOn: PAST_SEASON, leftOn: SEASON_START }]
+      : []
+    history.push({
+      groupId,
+      joinedOn: SEASON_START,
+      ...(left ? { leftOn: LEFT_ON } : {}),
+    })
+    // Her 11'de bir aktif sporcu ikinci bir grupta daha oynar (ör. maç kadrosu).
+    if (!left && index % 11 === 4) {
+      history.push({ groupId: groups[(index + 2) % groups.length].id, joinedOn: SECOND_GROUP_ON })
+    }
+    return {
+      id: `player-${index + 1}`,
+      firstName: row.PlayerName,
+      lastName: row.PlayerLastName,
+      birthDate: row.PlayerBirthDate,
+      gender: row.PlayerGender === 'female' ? 'female' : 'male',
+      status: left ? ('inactive' as const) : ('active' as const),
+      guardianName: row.ParentName,
+      guardianPhone: row.Phone,
+      groupHistory: history,
+    }
+  })
 
   const sessions: Session[] = []
   const attendance: Attendance[] = []
@@ -72,7 +104,9 @@ export function buildSeed(today = new Date('2026-09-19')): MockSeed {
       sessions.push(session)
 
       players
-        .filter((player) => player.groupId === group.id && player.status === 'active')
+        .filter((player) =>
+          player.groupHistory.some((spell) => spell.groupId === group.id && !spell.leftOn),
+        )
         .forEach((player, index) => {
           const roll = (index + week) % 7
           attendance.push({

@@ -2,6 +2,11 @@ import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDataSource } from '../../app/dataSource'
 import { DomainError } from '../../domain/errors'
+import type { Id, ScheduleSlot } from '../../domain/types'
+import { WEEKDAY_LABEL } from '../attendance/date'
+import { addSlot, hasSlotOn, removeSlot, scheduleLabel } from './schedule'
+
+const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7]
 
 const slugify = (value: string) =>
   value
@@ -38,8 +43,18 @@ export function ManageScreen() {
     onError: fail,
   })
   const addGroup = useMutation({
-    mutationFn: (input: { name: string; schoolId: string; branchId: string }) =>
-      db.groups.create({ ...input, schedule: [] }),
+    mutationFn: (input: {
+      name: string
+      schoolId: string
+      branchId: string
+      schedule: ScheduleSlot[]
+    }) => db.groups.create(input),
+    onSuccess: refresh,
+    onError: fail,
+  })
+  const setSchedule = useMutation({
+    mutationFn: (input: { id: Id; schedule: ScheduleSlot[] }) =>
+      db.groups.update(input.id, { schedule: input.schedule }),
     onSuccess: refresh,
     onError: fail,
   })
@@ -47,7 +62,7 @@ export function ManageScreen() {
   return (
     <section className="space-y-4">
       {error && (
-        <p className="rounded-xl bg-danger/10 px-4 py-2 text-sm text-danger">{error}</p>
+        <p className="rounded-xl bg-absent-soft px-4 py-2 text-sm text-absent">{error}</p>
       )}
 
       <Card title="Okullar" count={schools.data?.length}>
@@ -71,11 +86,18 @@ export function ManageScreen() {
             const school = schools.data?.find((row) => row.id === group.schoolId)
             const branch = branches.data?.find((row) => row.id === group.branchId)
             return (
-              <li key={group.id} className="flex justify-between rounded-lg bg-surface px-3 py-2">
-                <span className="font-medium">{group.name}</span>
-                <span className="text-ink/50">
-                  {school?.name ?? '—'} · {branch?.name ?? '—'}
-                </span>
+              <li key={group.id} className="rounded-lg bg-surface-2 px-3 py-2">
+                <div className="flex justify-between gap-2">
+                  <span className="font-medium">{group.name}</span>
+                  <span className="text-ink-2">
+                    {school?.name ?? '—'} · {branch?.name ?? '—'}
+                  </span>
+                </div>
+                <ScheduleRow
+                  schedule={group.schedule}
+                  busy={setSchedule.isPending}
+                  onSave={(schedule) => setSchedule.mutate({ id: group.id, schedule })}
+                />
               </li>
             )
           })}
@@ -95,10 +117,10 @@ function Card({
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
+    <div className="rounded-[20px] border border-line bg-surface p-4">
       <div className="mb-3 flex items-baseline justify-between">
         <h2 className="font-display font-semibold">{title}</h2>
-        <span className="text-xs text-ink/40">{count ?? 0} kayıt</span>
+        <span className="text-xs text-ink-3">{count ?? 0} kayıt</span>
       </div>
       {children}
     </div>
@@ -126,9 +148,9 @@ function NameForm({
         onChange={(event) => setValue(event.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="flex-1 rounded-xl border border-black/10 bg-surface px-3 py-2 text-sm"
+        className="flex-1 min-h-11 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
       />
-      <button type="submit" className="rounded-xl bg-brand px-4 py-2 text-sm font-medium text-white">
+      <button type="submit" className="min-h-11 rounded-xl bg-brand px-4 py-2 text-sm font-medium text-bg transition hover:opacity-90">
         Ekle
       </button>
     </form>
@@ -142,17 +164,24 @@ function GroupForm({
 }: {
   schools: { id: string; name: string }[]
   branches: { id: string; name: string }[]
-  onSubmit: (input: { name: string; schoolId: string; branchId: string }) => void
+  onSubmit: (input: {
+    name: string
+    schoolId: string
+    branchId: string
+    schedule: ScheduleSlot[]
+  }) => void
 }) {
   const [name, setName] = useState('')
   const [schoolId, setSchoolId] = useState('')
   const [branchId, setBranchId] = useState('')
+  const [schedule, setSchedule] = useState<ScheduleSlot[]>([])
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (!name.trim() || !schoolId || !branchId) return
-    onSubmit({ name: name.trim(), schoolId, branchId })
+    onSubmit({ name: name.trim(), schoolId, branchId, schedule })
     setName('')
+    setSchedule([])
   }
 
   return (
@@ -162,13 +191,13 @@ function GroupForm({
         onChange={(event) => setName(event.target.value)}
         placeholder="Grup adı"
         aria-label="Grup adı"
-        className="rounded-xl border border-black/10 bg-surface px-3 py-2 text-sm sm:col-span-2"
+        className="min-h-11 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm sm:col-span-2"
       />
       <select
         value={schoolId}
         onChange={(event) => setSchoolId(event.target.value)}
         aria-label="Okul"
-        className="rounded-xl border border-black/10 bg-surface px-3 py-2 text-sm"
+        className="min-h-11 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
       >
         <option value="">Okul seç</option>
         {schools.map((school) => (
@@ -181,7 +210,7 @@ function GroupForm({
         value={branchId}
         onChange={(event) => setBranchId(event.target.value)}
         aria-label="Branş"
-        className="rounded-xl border border-black/10 bg-surface px-3 py-2 text-sm"
+        className="min-h-11 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
       >
         <option value="">Branş seç</option>
         {branches.map((branch) => (
@@ -190,9 +219,12 @@ function GroupForm({
           </option>
         ))}
       </select>
+      <div className="sm:col-span-4">
+        <SlotPicker schedule={schedule} onChange={setSchedule} />
+      </div>
       <button
         type="submit"
-        className="rounded-xl bg-brand px-4 py-2 text-sm font-medium text-white sm:col-span-4"
+        className="min-h-11 rounded-xl bg-brand px-4 py-2 text-sm font-medium text-bg transition hover:opacity-90 sm:col-span-4"
       >
         Grup ekle
       </button>
@@ -204,10 +236,129 @@ function Chips({ items }: { items: string[] }) {
   return (
     <div className="mt-3 flex flex-wrap gap-2">
       {items.map((item) => (
-        <span key={item} className="rounded-full bg-surface px-3 py-1 text-xs text-ink/70">
+        <span key={item} className="rounded-full bg-surface-2 px-3 py-1 text-xs text-ink-2">
           {item}
         </span>
       ))}
+    </div>
+  )
+}
+
+/** Gün düğmeleri + saat + süre. Gün açılınca o saatte slot açılır, kapanınca silinir. */
+function SlotPicker({
+  schedule,
+  onChange,
+}: {
+  schedule: ScheduleSlot[]
+  onChange: (schedule: ScheduleSlot[]) => void
+}) {
+  const [startTime, setStartTime] = useState('17:00')
+  const [durationMinutes, setDurationMinutes] = useState(90)
+
+  const toggle = (weekday: number) => {
+    const exists = schedule.some(
+      (slot) => slot.weekday === weekday && slot.startTime === startTime,
+    )
+    onChange(
+      exists
+        ? removeSlot(schedule, weekday, startTime)
+        : addSlot(schedule, { weekday, startTime, durationMinutes }),
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1">
+        {WEEKDAYS.map((weekday) => {
+          const on = hasSlotOn(schedule, weekday)
+          return (
+            <button
+              key={weekday}
+              type="button"
+              aria-pressed={on}
+              onClick={() => toggle(weekday)}
+              className={`min-h-11 flex-1 rounded-xl px-2 text-xs font-medium ${
+                on ? 'bg-brand text-bg' : 'bg-surface-2 text-ink-2'
+              }`}
+            >
+              {WEEKDAY_LABEL[weekday]}
+            </button>
+          )
+        })}
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="time"
+          value={startTime}
+          onChange={(event) => event.target.value && setStartTime(event.target.value)}
+          aria-label="Başlangıç saati"
+          className="min-h-11 flex-1 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
+        />
+        <input
+          type="number"
+          min={15}
+          step={15}
+          value={durationMinutes}
+          onChange={(event) => setDurationMinutes(Number(event.target.value) || 90)}
+          aria-label="Süre (dakika)"
+          className="min-h-11 w-28 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
+        />
+      </div>
+      <p className="text-xs text-ink-2">{scheduleLabel(schedule) || 'gün tanımlı değil'}</p>
+    </div>
+  )
+}
+
+/** Liste satırında takvim özeti; düzenleme aynı SlotPicker ile açılır. */
+function ScheduleRow({
+  schedule,
+  busy,
+  onSave,
+}: {
+  schedule: ScheduleSlot[]
+  busy: boolean
+  onSave: (schedule: ScheduleSlot[]) => void
+}) {
+  const [draft, setDraft] = useState<ScheduleSlot[] | null>(null)
+
+  if (draft === null) {
+    return (
+      <div className="mt-1 flex items-center justify-between gap-2 text-xs">
+        <span className="text-ink-2">{scheduleLabel(schedule) || 'gün tanımlı değil'}</span>
+        <button
+          type="button"
+          onClick={() => setDraft(schedule)}
+          className="shrink-0 text-ink-2 underline underline-offset-2"
+        >
+          Günleri düzenle
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-2 space-y-2">
+      <SlotPicker schedule={draft} onChange={setDraft} />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setDraft(null)}
+          className="min-h-11 flex-1 rounded-xl bg-surface-2 text-sm font-medium text-ink-2"
+        >
+          Vazgeç
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            onSave(draft)
+            setDraft(null)
+          }}
+          className="min-h-11 flex-1 rounded-xl bg-brand text-sm font-medium text-bg disabled:opacity-40"
+        >
+          Kaydet
+        </button>
+      </div>
     </div>
   )
 }

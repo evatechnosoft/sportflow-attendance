@@ -31,18 +31,23 @@ export interface GroupFilter {
 export interface GroupRepository {
   list(filter?: GroupFilter): Promise<Group[]>
   create(input: Omit<Group, 'id'>): Promise<Group>
+  /** Ad, okul/branş ve antrenman takvimi tek kapıdan güncellenir. */
+  update(id: Id, patch: Partial<Omit<Group, 'id'>>): Promise<Group>
   remove(id: Id): Promise<void>
 }
 
 export interface PlayerRepository {
   listByGroup(groupId: Id, options?: { includeInactive?: boolean }): Promise<Player[]>
   create(input: Omit<Player, 'id'>): Promise<Player>
-  setStatus(id: Id, status: Player['status']): Promise<Player>
+  /** Durum, grup ve dönem geçmişi tek kapıdan güncellenir. */
+  update(id: Id, patch: Partial<Omit<Player, 'id'>>): Promise<Player>
 }
 
 export interface SessionRepository {
   /** Aynı grup + tarih için ikinci oturum açmaz, var olanı döner. */
   ensure(groupId: Id, date: string, startTime?: string): Promise<Session>
+  /** Salon sınav olunca saat kayar — yalnız o oturumu etkiler. */
+  update(id: Id, patch: { startTime?: string }): Promise<Session>
   listByGroup(groupId: Id): Promise<Session[]>
 }
 

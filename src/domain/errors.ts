@@ -14,5 +14,8 @@ export const notFound = (entity: string, id: string) =>
 export const duplicate = (entity: string, field: string, value: string) =>
   new DomainError('duplicate', `${entity} için ${field} zaten kullanılıyor: ${value}`)
 
+export const invalid = (entity: string, reason: string) =>
+  new DomainError('invalid', `${entity} geçersiz: ${reason}`)
+
 export const inUse = (entity: string, id: string) =>
   new DomainError('in_use', `${entity} kullanımda olduğu için silinemez: ${id}`)

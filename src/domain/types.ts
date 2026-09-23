@@ -32,16 +32,27 @@ export interface Group {
   schedule: ScheduleSlot[]
 }
 
+/** Bir sporcunun bir gruptaki dönemi. Açık dönem: leftOn yok. */
+export interface GroupSpell {
+  groupId: Id
+  /** ISO date, YYYY-MM-DD */
+  joinedOn: string
+  /** ISO date; yoksa sporcu bu grupta hâlâ aktif. */
+  leftOn?: string
+}
+
 export interface Player {
   id: Id
   firstName: string
   lastName: string
   birthDate?: string
   gender?: Gender
-  groupId: Id
+  /** Kulüp geneli durum: hiç açık dönemi kalmayan sporcu pasiftir. */
   status: PlayerStatus
   guardianName?: string
   guardianPhone?: string
+  /** Geçmişten bugüne, joinedOn'a göre artan. Son kayıt güncel dönemdir. */
+  groupHistory: GroupSpell[]
 }
 
 export interface Session {

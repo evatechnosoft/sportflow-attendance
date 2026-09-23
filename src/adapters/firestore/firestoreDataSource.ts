@@ -21,7 +21,6 @@ import {
   schoolsFromGroups,
   toBranches,
   toClubIdentity,
-  toGroup,
   toPlayer,
   type FirestoreAthlete,
   type FirestoreGroup,
@@ -53,7 +52,9 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
 
   const loadGroups = async (): Promise<Group[]> => {
     const snapshot = await getDocs(collection(db, 'groups'))
-    return dedupeGroups(snapshot.docs.map((row) => toGroup(row.id, row.data() as FirestoreGroup)))
+    return dedupeGroups(
+      snapshot.docs.map((row) => ({ id: row.id, raw: row.data() as FirestoreGroup })),
+    )
   }
 
   return {
@@ -94,6 +95,9 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
       async create() {
         throw readOnly()
       },
+      async update() {
+        throw readOnly()
+      },
       async remove() {
         throw readOnly()
       },
@@ -112,7 +116,7 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
       async create() {
         throw readOnly()
       },
-      async setStatus() {
+      async update() {
         throw readOnly()
       },
     },
@@ -121,6 +125,9 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
       // Eski şemada oturum ayrı belge değil: kimlik groupId + tarihten türetilir.
       async ensure(groupId, date, startTime) {
         return { id: sessionDocId(groupId, date), groupId, date, startTime }
+      },
+      async update() {
+        throw readOnly()
       },
       async listByGroup(groupId) {
         const snapshot = await getDocs(

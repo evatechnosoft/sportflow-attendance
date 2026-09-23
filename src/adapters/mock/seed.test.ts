@@ -11,9 +11,20 @@ describe('buildSeed', () => {
     expect(seed.groups?.length).toBeGreaterThan(3)
   })
 
-  it('her oyuncu var olan bir gruba bağlıdır', () => {
+  it('her dönem var olan bir gruba bağlıdır', () => {
     const groupIds = new Set(seed.groups?.map((group) => group.id))
-    expect(seed.players?.every((player) => groupIds.has(player.groupId))).toBe(true)
+    expect(
+      seed.players?.every((player) =>
+        player.groupHistory.every((spell) => groupIds.has(spell.groupId)),
+      ),
+    ).toBe(true)
+  })
+
+  it('en az bir sporcu aynı anda iki gruptadır', () => {
+    const multi = seed.players?.filter(
+      (player) => player.groupHistory.filter((spell) => !spell.leftOn).length > 1,
+    )
+    expect(multi?.length).toBeGreaterThan(0)
   })
 
   it('geçmiş oturumların yoklaması yalnız aktif oyuncular için yazılır', () => {
@@ -21,6 +32,17 @@ describe('buildSeed', () => {
       seed.players?.filter((player) => player.status === 'active').map((player) => player.id),
     )
     expect(seed.attendance?.every((row) => activeIds.has(row.playerId))).toBe(true)
+  })
+
+  it('demo veride ayrılmış sporcu ve iki dönemli sporcu bulunur', () => {
+    const players = seed.players!
+    expect(players.some((player) => player.status === 'inactive')).toBe(true)
+    expect(players.some((player) => player.groupHistory.length > 1)).toBe(true)
+    // Ayrılan sporcunun son dönemi kapalı, aktif sporcununki açık.
+    for (const player of players) {
+      const open = player.groupHistory.at(-1)!.leftOn === undefined
+      expect(open).toBe(player.status === 'active')
+    }
   })
 
   it('oturum tarihleri grubun gününe denk gelir', () => {

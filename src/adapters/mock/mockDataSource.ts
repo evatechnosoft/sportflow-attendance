@@ -1,4 +1,4 @@
-import { duplicate, inUse, notFound } from '../../domain/errors'
+import { duplicate, inUse, invalid, notFound } from '../../domain/errors'
 import type {
   Attendance,
   AttendanceStatus,
@@ -6,6 +6,7 @@ import type {
   Group,
   Id,
   Player,
+  ScheduleSlot,
   School,
   Session,
 } from '../../domain/types'
@@ -50,6 +51,23 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
 
   let counter = 0
   const nextId = (prefix: string) => `${prefix}-${++counter}`
+
+  /** Kural 1-2: gün 1-7 aralığında ve gün + saat çifti tekil. */
+  const requireValidSchedule = (schedule: ScheduleSlot[]) => {
+    const seen = new Set<string>()
+    for (const slot of schedule) {
+      if (!Number.isInteger(slot.weekday) || slot.weekday < 1 || slot.weekday > 7) {
+        throw invalid('Antrenman günü', `${slot.weekday} — 1-7 aralığında olmalı`)
+      }
+      const key = `${slot.weekday}|${slot.startTime}`
+      if (seen.has(key)) throw duplicate('Grup', 'gün + saat', key)
+      seen.add(key)
+    }
+  }
+
+  /** Sporcunun o gruptaki dönemleri — açık dönem üyelik, kapalı dönem geçmiştir. */
+  const spellsIn = (player: Player, groupId: Id) =>
+    player.groupHistory.filter((spell) => spell.groupId === groupId)
 
   const requireGroup = (id: Id) => {
     const group = groups.find((row) => row.id === id)
@@ -118,12 +136,19 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
         if (!branches.some((row) => row.id === input.branchId)) {
           throw notFound('Branş', input.branchId)
         }
+        requireValidSchedule(input.schedule)
         const row: Group = { ...input, id: nextId('group') }
         groups.push(row)
         return { ...row }
       },
+      async update(id, patch) {
+        const row = requireGroup(id)
+        if (patch.schedule) requireValidSchedule(patch.schedule)
+        Object.assign(row, patch)
+        return { ...row }
+      },
       async remove(id) {
-        if (players.some((row) => row.groupId === id)) throw inUse('Grup', id)
+        if (players.some((row) => spellsIn(row, id).length > 0)) throw inUse('Grup', id)
         const index = groups.findIndex((row) => row.id === id)
         if (index < 0) throw notFound('Grup', id)
         groups.splice(index, 1)
@@ -133,23 +158,29 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
     players: {
       async listByGroup(groupId, options = {}) {
         return clone(
-          players.filter(
-            (row) =>
-              row.groupId === groupId &&
-              (options.includeInactive || row.status === 'active'),
-          ),
+          players.filter((row) => {
+            const spells = spellsIn(row, groupId)
+            return options.includeInactive
+              ? spells.length > 0
+              : spells.some((spell) => !spell.leftOn)
+          }),
         )
       },
       async create(input) {
-        requireGroup(input.groupId)
+        for (const spell of input.groupHistory) requireGroup(spell.groupId)
         const row: Player = { ...input, id: nextId('player') }
         players.push(row)
         return { ...row }
       },
-      async setStatus(id, status) {
+      async update(id, patch) {
         const row = players.find((candidate) => candidate.id === id)
         if (!row) throw notFound('Oyuncu', id)
-        row.status = status
+        for (const spell of patch.groupHistory ?? []) requireGroup(spell.groupId)
+        Object.assign(row, patch)
+        // Durum üyelikten türetilir; çağıranın gönderdiği status'e güvenilmez.
+        if (patch.groupHistory) {
+          row.status = row.groupHistory.some((spell) => !spell.leftOn) ? 'active' : 'inactive'
+        }
         return { ...row }
       },
     },
@@ -161,6 +192,12 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
         if (existing) return { ...existing }
         const row: Session = { id: nextId('session'), groupId, date, startTime }
         sessions.push(row)
+        return { ...row }
+      },
+      async update(id, patch) {
+        const row = sessions.find((candidate) => candidate.id === id)
+        if (!row) throw notFound('Oturum', id)
+        Object.assign(row, patch)
         return { ...row }
       },
       async listByGroup(groupId) {
@@ -184,7 +221,8 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
 
         for (const mark of marks) {
           const player = players.find((row) => row.id === mark.playerId)
-          if (!player || player.groupId !== session.groupId) {
+          // Geçmiş yoklama düzeltilebilsin: kapanmış dönem de o gruba aitlik sayılır.
+          if (!player || spellsIn(player, session.groupId).length === 0) {
             throw notFound('Grubun oyuncusu', mark.playerId)
           }
         }

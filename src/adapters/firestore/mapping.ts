@@ -53,10 +53,11 @@ export function toPlayer(id: string, raw: FirestoreAthlete): Player {
     firstName: parts.slice(0, -1).join(' ') || parts[0] || '(isimsiz)',
     lastName: parts.length > 1 ? parts[parts.length - 1] : '',
     birthDate: raw.birthYear ? `${raw.birthYear}-01-01` : undefined,
-    groupId: raw.groupId ?? '',
     status: raw.status === 'approved' ? 'active' : 'inactive',
     guardianName: raw.parentName,
     guardianPhone: raw.parentPhone,
+    // Eski şemada dönem geçmişi yok; okunan kayıt tek açık dönem sayılır.
+    groupHistory: [{ groupId: raw.groupId ?? '', joinedOn: '' }],
   }
 }
 
@@ -70,16 +71,18 @@ export interface FirestoreGroup {
 }
 
 export function toGroup(id: string, raw: FirestoreGroup): Group {
-  const startTime = raw.startTime ?? raw.sessionTime
   return {
     id,
-    name: groupDisplayName(raw.name, startTime),
+    name: groupDisplayName(raw.name, startTimeOf(raw)),
     branchId: raw.branchId ?? '',
     schoolId: raw.schoolId ?? UNASSIGNED_SCHOOL,
     coachName: raw.coachId,
-    schedule: startTime ? [{ weekday: 0, startTime, durationMinutes: 90 }] : [],
+    // Canlı grup belgesinde gün yok, yalnız saat var: uydurma gün üretmeyiz.
+    schedule: [],
   }
 }
+
+const startTimeOf = (raw: FirestoreGroup) => raw.startTime ?? raw.sessionTime
 
 /** Eski uygulamanın yoklama belge kimliği: groups ve tarih birleşimi. */
 export function sessionDocId(groupId: string, date: string): string {
@@ -137,13 +140,15 @@ export function buildAttendanceDoc(input: AttendanceDocInput) {
 /**
  * Canlı veride aynı grup defalarca oluşmuş (demo seed + mükerrer kayıt):
  * 32 belgenin çoğu aynı ad/branş/saat üçlüsü. Seçicide bir kez görünsün.
+ * Saat domain Group'unda tutulmadığı için tekilleştirme ham belge üzerinden yapılır.
  * ponytail: görüntüde tekilleştirme; asıl temizlik Firestore tarafında yapılmalı.
  */
-export function dedupeGroups(groups: Group[]): Group[] {
+export function dedupeGroups(rows: { id: string; raw: FirestoreGroup }[]): Group[] {
   const seen = new Map<string, Group>()
-  for (const group of groups) {
-    const key = `${group.name.toLocaleLowerCase('tr')}|${group.branchId}|${group.schedule[0]?.startTime ?? ''}`
-    if (!seen.has(key)) seen.set(key, group)
+  for (const { id, raw } of rows) {
+    const name = groupDisplayName(raw.name, startTimeOf(raw))
+    const key = `${name.toLocaleLowerCase('tr')}|${raw.branchId ?? ''}|${startTimeOf(raw) ?? ''}`
+    if (!seen.has(key)) seen.set(key, toGroup(id, raw))
   }
   return [...seen.values()]
 }

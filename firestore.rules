@@ -1,0 +1,249 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() { return request.auth != null; }
+    function isValidId(id) { return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    function normalizedEmail() {
+      return request.auth != null && request.auth.token.email != null
+        ? request.auth.token.email.lower()
+        : '';
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email.lower() == 'anadolusporduyuru@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isStaff() {
+      return isSignedIn() && (
+        isAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['coach', 'staff'])
+      );
+    }
+
+    function isValidAthlete(data) {
+      return data.keys().hasAll(['groupId', 'coachId', 'fullName', 'birthYear', 'position', 'jerseyNumber', 'isPresent', 'parentPhone', 'parentEmail', 'parentName', 'parentRelation', 'emergencyContact', 'createdAt', 'status', 'isEmergencySameAsParent'])
+        && data.keys().hasOnly(['groupId', 'coachId', 'fullName', 'birthYear', 'position', 'jerseyNumber', 'isPresent', 'parentPhone', 'parentEmail', 'parentName', 'parentRelation', 'emergencyContact', 'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelation', 'isEmergencySameAsParent', 'studentNumber', 'studentPhone', 'studentEmail', 'createdAt', 'photoURL', 'monthlyFee', 'branchId', 'status'])
+        && data.groupId is string && data.groupId.size() <= 128
+        && data.coachId is string && data.coachId.size() > 0 && data.coachId.size() <= 128
+        && data.fullName is string && data.fullName.size() <= 100
+        && data.birthYear is number
+        && data.position is string && data.position.size() <= 60
+        && data.jerseyNumber is string && data.jerseyNumber.size() <= 10
+        && data.isPresent is bool
+        && data.parentPhone is string && data.parentPhone.size() <= 30
+        && data.parentEmail is string && data.parentEmail.size() <= 100
+        && data.emergencyContact is string && data.emergencyContact.size() <= 200
+        && data.createdAt is number
+        && data.status in ['approved', 'pending']
+        && (!('monthlyFee' in data) || data.monthlyFee is number)
+        && (!('photoURL' in data) || data.photoURL is string)
+        && (!('branchId' in data) || data.branchId is string)
+        && (!('studentNumber' in data) || (data.studentNumber is string && data.studentNumber.size() <= 50));
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update, delete: if isAdmin() || request.auth.uid == userId;
+    }
+
+    match /athletes/{athleteId} {
+      allow get: if isSignedIn() && (
+        isStaff() || 
+        resource.data.coachId == request.auth.uid ||
+        resource.data.parentEmail == request.auth.token.email
+      );
+      allow list: if isSignedIn();
+      allow create: if isSignedIn()
+        && isValidAthlete(incoming())
+        && exists(/databases/$(database)/documents/groups/$(incoming().groupId))
+        && (
+          (incoming().coachId == request.auth.uid && get(/databases/$(database)/documents/groups/$(incoming().groupId)).data.coachId == request.auth.uid)
+          || isAdmin()
+          || (incoming().parentEmail == request.auth.token.email) // Parent can create athlete if parentEmail matches their email
+        );
+      allow update: if isSignedIn() && (isStaff() || existing().coachId == request.auth.uid);
+      allow delete: if isAdmin() || (isSignedIn() && existing().coachId == request.auth.uid);
+    }
+    
+    match /settings/{documentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    function isValidGroup(data) {
+      return data.keys().hasAll(['coachId', 'createdAt'])
+        && data.keys().hasOnly(['coachId', 'name', 'createdAt', 'sessionTime', 'branchId', 'description', 'startTime', 'endTime'])
+        && data.coachId == request.auth.uid
+        && (!('name' in data) || (data.name is string && data.name.size() <= 100))
+        && data.createdAt is number
+        && (!('startTime' in data) || (data.startTime is string && data.startTime.size() <= 8))
+        && (!('endTime' in data) || (data.endTime is string && data.endTime.size() <= 8))
+        && (!('sessionTime' in data) || (data.sessionTime is string && data.sessionTime.size() <= 64))
+        && (!('description' in data) || (data.description is string && data.description.size() <= 200))
+        && (!('branchId' in data) || (data.branchId is string && data.branchId.size() <= 64));
+    }
+
+    match /groups/{groupId} {
+      allow read: if isSignedIn(); 
+      allow create: if isSignedIn() && isValidGroup(incoming());
+      allow update: if isSignedIn() && (existing().coachId == request.auth.uid || isAdmin() || isStaff());
+      allow delete: if isSignedIn() && (existing().coachId == request.auth.uid || isAdmin());
+    }
+
+    function isValidAttendance(data) {
+      return data.keys().hasAll(['groupId', 'coachId', 'date', 'createdAt', 'records'])
+        && (data.coachId == request.auth.uid || isAdmin() || isStaff())
+        && data.groupId is string && data.groupId.size() <= 128
+        && data.date is string && data.date.size() <= 15
+        && data.createdAt is number
+        && data.records is map
+        && (!('type' in data) || data.type in ['practice', 'match']);
+    }
+
+    match /attendance/{sessionId} {
+      allow read: if isSignedIn(); 
+      allow create: if isSignedIn() && isValidAttendance(incoming()) && (isAdmin() || isStaff() || exists(/databases/$(database)/documents/groups/$(incoming().groupId)));
+      allow update: if isSignedIn() && isValidAttendance(incoming()) && (incoming().coachId == request.auth.uid || existing().coachId == request.auth.uid || isAdmin() || isStaff());
+      allow delete: if isAdmin(); 
+    }
+
+    match /athlete_progress_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn()
+        && incoming().keys().hasAll(['athleteId', 'groupId', 'coachId', 'date', 'type', 'techScore', 'spiritScore', 'createdAt'])
+        && incoming().keys().hasOnly(['athleteId', 'groupId', 'coachId', 'date', 'type', 'techScore', 'spiritScore', 'createdAt'])
+        && incoming().athleteId is string
+        && incoming().groupId is string
+        && incoming().coachId is string
+        && incoming().date is string
+        && incoming().type in ['practice', 'match']
+        && (incoming().techScore == null || incoming().techScore is number)
+        && (incoming().spiritScore == null || incoming().spiritScore is number)
+        && incoming().createdAt is number
+        && (incoming().coachId == request.auth.uid || isAdmin() || isStaff());
+      allow delete: if isAdmin();
+    }
+
+    function isValidPayment(data) {
+      return data.keys().hasAll(['athleteId', 'amount', 'month', 'status', 'coachId'])
+        && data.keys().hasOnly(['athleteId', 'amount', 'month', 'status', 'coachId', 'paymentDate'])
+        && data.athleteId is string && data.athleteId.size() <= 128
+        && data.amount is number
+        && data.month is string && data.month.size() == 7
+        && data.status in ['Ödendi', 'Bekliyor', 'Gecikti']
+        && data.coachId is string
+        && (!('paymentDate' in data) || data.paymentDate is number);
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isSignedIn() && (
+        resource.data.coachId == request.auth.uid || 
+        isAdmin() || 
+        isStaff() ||
+        (get(/databases/$(database)/documents/athletes/$(resource.data.athleteId)).data.parentEmail == request.auth.token.email)
+      );
+      allow create: if isSignedIn() && isValidPayment(incoming()) && (isAdmin() || isStaff() || incoming().coachId == request.auth.uid);
+      allow update: if isSignedIn() && (isAdmin() || isStaff() || existing().coachId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    match /matches/{matchId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin(); 
+    }
+
+    match /memories/{memoryId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /athlete_notes/{noteId} {
+      allow read: if isSignedIn() && (
+        isAdmin() || 
+        isStaff() ||
+        (exists(/databases/$(database)/documents/athletes/$(resource.data.athleteId)) && 
+         (get(/databases/$(database)/documents/athletes/$(resource.data.athleteId)).data.coachId == request.auth.uid ||
+          get(/databases/$(database)/documents/athletes/$(resource.data.athleteId)).data.parentEmail == request.auth.token.email))
+      );
+      allow create: if isSignedIn()
+        && incoming().keys().hasAll(['athleteId', 'senderId', 'senderRole', 'senderName', 'message', 'createdAt', 'isRead'])
+        && incoming().keys().hasOnly(['athleteId', 'senderId', 'senderRole', 'senderName', 'message', 'createdAt', 'isRead'])
+        && incoming().athleteId is string
+        && incoming().senderId == request.auth.uid
+        && incoming().senderRole in ['coach', 'parent', 'admin']
+        && incoming().senderName is string
+        && incoming().message is string
+        && incoming().message.size() > 0
+        && incoming().message.size() <= 2000
+        && incoming().createdAt is number
+        && incoming().isRead == false
+        && (
+          isAdmin() ||
+          isStaff() ||
+          (exists(/databases/$(database)/documents/athletes/$(incoming().athleteId)) &&
+           get(/databases/$(database)/documents/athletes/$(incoming().athleteId)).data.parentEmail == request.auth.token.email)
+        );
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (
+          incoming().diff(existing()).changedKeys().hasOnly(['isRead']) &&
+          incoming().isRead == true &&
+          (
+            isStaff() ||
+            (exists(/databases/$(database)/documents/athletes/$(existing().athleteId)) &&
+             get(/databases/$(database)/documents/athletes/$(existing().athleteId)).data.parentEmail == request.auth.token.email)
+          )
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow get: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.senderId == request.auth.uid || 
+        resource.data.targetEmail == request.auth.token.email ||
+        resource.data.targetType == 'all'
+      );
+      allow list: if isSignedIn();
+      allow create: if isAdmin() || (isSignedIn() && (incoming().senderId == request.auth.uid));
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        existing().targetEmail == request.auth.token.email ||
+        (
+          incoming().diff(existing()).changedKeys().hasOnly(['readBy']) &&
+          incoming().readBy is list &&
+          request.auth.uid in incoming().readBy
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /archives/{archiveId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin() || (isSignedIn() && (incoming().coachId == request.auth.uid));
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /registrations/{regId} {
+      allow read: if isAdmin() || isStaff();
+      allow create: if isSignedIn();
+      allow update: if isAdmin() || isStaff();
+      allow delete: if isAdmin() || isStaff();
+    }
+  }
+}

@@ -64,6 +64,10 @@ describe('toPlayer', () => {
 })
 
 describe('toGroup', () => {
+  it('gün bilgisi olmayan canlı grup boş takvimle gelir — uydurma gün üretilmez', () => {
+    expect(toGroup('g1', { name: 'U14', startTime: '17:00' }).schedule).toEqual([])
+  })
+
   it('okulu olmayan eski grup "atanmamış okul"a düşer', () => {
     expect(toGroup('g1', { name: 'U14' }).schoolId).toBe(UNASSIGNED_SCHOOL)
   })
@@ -111,8 +115,10 @@ describe('buildAttendanceDoc', () => {
 })
 
 describe('dedupeGroups', () => {
-  const make = (id: string, name: string, startTime?: string) =>
-    toGroup(id, { name, branchId: 'volleyball', startTime })
+  const make = (id: string, name: string, startTime?: string) => ({
+    id,
+    raw: { name, branchId: 'volleyball', startTime },
+  })
 
   it('aynı ad/branş/saat üçlüsü bir kez görünür', () => {
     const groups = dedupeGroups([
@@ -123,9 +129,14 @@ describe('dedupeGroups', () => {
     expect(groups.map((group) => group.id)).toEqual(['g1', 'g3'])
   })
 
-  it('saati farklı olan aynı ad ayrı gruptur', () => {
+  it('saati farklı olan aynı ad ayrı gruptur — schedule boş olsa da', () => {
     const groups = dedupeGroups([make('g1', 'Midi Kız A', '11:00'), make('g2', 'Midi Kız A', '16:00')])
     expect(groups).toHaveLength(2)
+    expect(groups.every((group) => group.schedule.length === 0)).toBe(true)
+  })
+
+  it('saatsiz mükerrer kayıtlar yine tek görünür', () => {
+    expect(dedupeGroups([make('g1', 'Yıldız Kız'), make('g2', 'Yıldız Kız')])).toHaveLength(1)
   })
 })
 
