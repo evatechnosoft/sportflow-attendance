@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ManageScreen } from './ManageScreen'
 import { DataSourceProvider } from '../../app/dataSource'
 import { createMockDataSource } from '../../adapters/mock/mockDataSource'
 import type { DataSource } from '../../ports/repositories'
+import type { ScheduleSlot } from '../../domain/types'
 
-async function setup(withGroup = false) {
+async function setup(withGroup = false, schedule: ScheduleSlot[] = []) {
   const db: DataSource = createMockDataSource()
   const school = await db.schools.create({ name: 'Atatürk Ortaokulu' })
   const branch = await db.branches.create({ name: 'Voleybol', slug: 'voleybol' })
@@ -16,7 +17,7 @@ async function setup(withGroup = false) {
       name: 'Voleybol U12',
       schoolId: school.id,
       branchId: branch.id,
-      schedule: [],
+      schedule,
     })
   }
 
@@ -64,6 +65,35 @@ describe('ManageScreen — grup takvimi', () => {
 
     await screen.findByText('Cumartesi 17:00')
     expect((await db.groups.list())[0].schedule).toHaveLength(1)
+  })
+
+  it('düzenlemede saat ve süre mevcut takvimden gelir, değişince tüm günlere yazılır', async () => {
+    const user = userEvent.setup({ delay: null })
+    const { db } = await setup(true, [
+      { weekday: 6, startTime: '12:00', durationMinutes: 60 },
+      { weekday: 7, startTime: '12:00', durationMinutes: 60 },
+    ])
+
+    const row = (await screen.findByText('Voleybol U12')).closest('li')
+    if (!row) throw new Error('Grup satırı bulunamadı')
+    await user.click(await within(row).findByRole('button', { name: 'Günleri düzenle' }))
+    const time = within(row).getByLabelText('Başlangıç saati') as HTMLInputElement
+    const duration = within(row).getByLabelText('Süre (dakika)') as HTMLInputElement
+    expect(time.value).toBe('12:00')
+    expect(duration.value).toBe('60')
+
+    await user.clear(duration)
+    expect(duration.value).toBe('')
+    await user.type(duration, '75')
+    fireEvent.change(time, { target: { value: '13:30' } })
+    await user.click(within(row).getByRole('button', { name: 'Kaydet' }))
+
+    await waitFor(async () =>
+      expect((await db.groups.list())[0].schedule).toEqual([
+        { weekday: 6, startTime: '13:30', durationMinutes: 75 },
+        { weekday: 7, startTime: '13:30', durationMinutes: 75 },
+      ]),
+    )
   })
 })
 

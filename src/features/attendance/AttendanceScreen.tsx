@@ -7,7 +7,7 @@ import { joinParts, useGroupOptions } from './useGroupOptions'
 import { AttendanceRow } from './AttendanceRow'
 import { useOverdue } from './useOverdue'
 import { GroupSheet } from './GroupSheet'
-import { dayLabel, shiftDay, shortDate, weekdayOf, WEEKDAY_LABEL } from './date'
+import { dayLabel, shiftDay, shortDate, todayIso, weekdayOf, WEEKDAY_LABEL } from './date'
 import { hasSlotOn } from '../manage/schedule'
 import { Sheet } from '../../app/Sheet'
 import type { ScheduleSlot } from '../../domain/types'
@@ -213,14 +213,16 @@ export function AttendanceScreen() {
           type="date"
           aria-label="Tarih"
           value={date}
+          max={todayIso()}
           onChange={(event) => event.target.value && setDate(event.target.value)}
           className="sr-only"
         />
         <button
           type="button"
           aria-label="Sonraki gün"
+          disabled={date >= todayIso()}
           onClick={() => setDate(shiftDay(date, 1))}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-ink-2 hover:bg-surface-2"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-ink-2 hover:bg-surface-2 disabled:opacity-30"
         >
           <Chevron turn="rotate-180" />
         </button>

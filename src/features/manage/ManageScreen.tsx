@@ -6,7 +6,7 @@ import { DomainError } from '../../domain/errors'
 import { DEFAULT_CLUB_SETTINGS, type Id, type OptionalField, type ScheduleSlot } from '../../domain/types'
 import { WEEKDAY_LABEL } from '../attendance/date'
 import { joinParts } from '../attendance/useGroupOptions'
-import { addSlot, hasSlotOn, removeSlot, scheduleLabel } from './schedule'
+import { addSlot, hasSlotOn, scheduleLabel } from './schedule'
 
 const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7]
 
@@ -427,7 +427,10 @@ function Chips({
   )
 }
 
-/** Gün düğmeleri + saat + süre. Gün açılınca o saatte slot açılır, kapanınca silinir. */
+/**
+ * Gün düğmeleri + tek saat + süre: grup her gün aynı saatte. Saat ve süre
+ * değişince seçili tüm günlere uygulanır; açılışta mevcut takvimden okunur.
+ */
 function SlotPicker({
   schedule,
   onChange,
@@ -435,18 +438,30 @@ function SlotPicker({
   schedule: ScheduleSlot[]
   onChange: (schedule: ScheduleSlot[]) => void
 }) {
-  const [startTime, setStartTime] = useState('17:00')
-  const [durationMinutes, setDurationMinutes] = useState(90)
+  const [startTime, setStartTime] = useState(schedule[0]?.startTime ?? '17:00')
+  const [durationMinutes, setDurationMinutes] = useState(schedule[0]?.durationMinutes ?? 90)
+  // Yazarken alan boşalabilsin; geçerli sayı gelince takvime yansır.
+  const [durationText, setDurationText] = useState(String(durationMinutes))
 
-  const toggle = (weekday: number) => {
-    const exists = schedule.some(
-      (slot) => slot.weekday === weekday && slot.startTime === startTime,
-    )
+  const toggle = (weekday: number) =>
     onChange(
-      exists
-        ? removeSlot(schedule, weekday, startTime)
+      hasSlotOn(schedule, weekday)
+        ? schedule.filter((slot) => slot.weekday !== weekday)
         : addSlot(schedule, { weekday, startTime, durationMinutes }),
     )
+
+  const changeTime = (value: string) => {
+    if (!value) return
+    setStartTime(value)
+    onChange(schedule.map((slot) => ({ ...slot, startTime: value })))
+  }
+
+  const changeDuration = (text: string) => {
+    setDurationText(text)
+    const minutes = Number(text)
+    if (!Number.isInteger(minutes) || minutes < 15) return
+    setDurationMinutes(minutes)
+    onChange(schedule.map((slot) => ({ ...slot, durationMinutes: minutes })))
   }
 
   return (
@@ -473,16 +488,18 @@ function SlotPicker({
         <input
           type="time"
           value={startTime}
-          onChange={(event) => event.target.value && setStartTime(event.target.value)}
+          onChange={(event) => changeTime(event.target.value)}
           aria-label="Başlangıç saati"
           className="min-h-11 flex-1 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
         />
         <input
           type="number"
+          inputMode="numeric"
           min={15}
-          step={15}
-          value={durationMinutes}
-          onChange={(event) => setDurationMinutes(Number(event.target.value) || 90)}
+          step={5}
+          value={durationText}
+          onChange={(event) => changeDuration(event.target.value)}
+          onBlur={() => setDurationText(String(durationMinutes))}
           aria-label="Süre (dakika)"
           className="min-h-11 w-28 rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
         />

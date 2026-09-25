@@ -13,7 +13,9 @@ const SelectionContext = createContext<Selection | null>(null)
 /** Grup + tarih seçimi Yoklama ve Geçmiş sekmeleri arasında ortak. */
 export function SelectionProvider({ children }: { children: ReactNode }) {
   const [groupId, setGroupId] = useState('')
-  const [date, setDate] = useState(() => todayIso())
+  const [date, setDateState] = useState(() => todayIso())
+  // Yoklama ileri tarihe alınmaz: bugünden sonrası bugüne çekilir.
+  const setDate = (iso: string) => setDateState(iso > todayIso() ? todayIso() : iso)
   return (
     <SelectionContext.Provider value={{ groupId, date, setGroupId, setDate }}>
       {children}

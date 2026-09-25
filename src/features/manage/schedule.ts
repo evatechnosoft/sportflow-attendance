@@ -23,14 +23,6 @@ export function addSlot(slots: ScheduleSlot[], slot: ScheduleSlot): ScheduleSlot
   return [...slots, slot].sort(byDayAndTime)
 }
 
-export function removeSlot(
-  slots: ScheduleSlot[],
-  weekday: number,
-  startTime: string,
-): ScheduleSlot[] {
-  return slots.filter((row) => !(row.weekday === weekday && row.startTime === startTime))
-}
-
 export function hasSlotOn(slots: ScheduleSlot[], weekday: number): boolean {
   return slots.some((slot) => slot.weekday === weekday)
 }
