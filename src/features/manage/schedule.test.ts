@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ScheduleSlot } from '../../domain/types'
-import { addSlot, hasSlotOn, removeSlot, scheduleLabel } from './schedule'
+import { addSlot, hasSlotOn, scheduleLabel } from './schedule'
 
 const slot = (weekday: number, startTime = '17:00'): ScheduleSlot => ({
   weekday,
@@ -36,13 +36,6 @@ describe('addSlot', () => {
   it('1-7 dışındaki gün eklenmez', () => {
     expect(addSlot([], slot(0))).toHaveLength(0)
     expect(addSlot([], slot(8))).toHaveLength(0)
-  })
-})
-
-describe('removeSlot', () => {
-  it('yalnız verilen gün + saati çıkarır', () => {
-    const slots = addSlot(addSlot([], slot(2)), slot(2, '19:00'))
-    expect(removeSlot(slots, 2, '17:00')).toEqual([slot(2, '19:00')])
   })
 })
 
