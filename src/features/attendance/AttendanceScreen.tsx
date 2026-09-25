@@ -306,7 +306,7 @@ export function AttendanceScreen() {
         </p>
       )}
 
-      <ul className="grid items-start gap-2 pb-40 lg:grid-cols-2">
+      <ul className="space-y-2 pb-40">
         {players.data?.map((player) => (
           <AttendanceRow
             key={player.id}
@@ -328,7 +328,7 @@ export function AttendanceScreen() {
 
       {/* 6. Sticky kaydet */}
       {dirty && (
-        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 mx-auto max-w-3xl px-4 md:bottom-6 md:max-w-md">
+        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 mx-auto max-w-3xl px-4">
           <div className="rounded-[20px] border border-line bg-surface/90 p-2 backdrop-blur">
             <button
               type="button"
@@ -356,7 +356,7 @@ export function AttendanceScreen() {
 
       {/* 7-8. Tek toast yeri */}
       {toast && (
-        <div className="fixed inset-x-0 bottom-[calc(148px+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-3xl justify-center px-4 md:bottom-28">
+        <div className="fixed inset-x-0 bottom-[calc(148px+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-3xl justify-center px-4">
           <div className="flex items-center gap-3 rounded-full bg-present px-4 py-2 text-sm font-medium text-bg">
             <span>{toast.text}</span>
             {toast.undo && (

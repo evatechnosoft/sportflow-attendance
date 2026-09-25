@@ -47,8 +47,8 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
   const currentTab: TabId = tabs.some((item) => item.id === tab) ? tab : 'attendance'
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col md:max-w-6xl">
-      <header className="sticky top-0 z-10 border-b-[3px] border-accent bg-header px-4 py-3 text-on-header md:px-6">
+    <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col">
+      <header className="sticky top-0 z-10 border-b-[3px] border-accent bg-header px-4 py-3 text-on-header">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" className="h-11 w-11 shrink-0" />
@@ -110,39 +110,9 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
             </button>
           </div>
         )}
-        {!needsLogin && (
-          <nav className="fixed inset-x-0 bottom-0 z-30 md:static md:-mx-6 md:mt-2 md:-mb-3">
-            <div className="mx-auto flex max-w-3xl border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur md:max-w-none md:gap-1 md:border-0 md:bg-transparent md:px-4 md:pb-0 md:backdrop-blur-none">
-              {tabs.map((item) => {
-                const active = currentTab === item.id
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setTab(item.id)}
-                    aria-current={active ? 'page' : undefined}
-                    className={`relative flex min-h-16 flex-1 flex-col items-center justify-center gap-0.5 transition md:min-h-12 md:flex-none md:flex-row md:gap-2 md:px-3 ${
-                      active ? 'text-brand md:text-on-header' : 'text-ink-2 md:text-on-header-2 md:hover:text-on-header'
-                    }`}
-                  >
-                    {active && <span className="absolute inset-x-5 top-0 h-[3px] rounded-b-full bg-accent md:inset-x-3 md:top-auto md:bottom-0 md:rounded-b-none md:rounded-t-full" />}
-                    <span
-                      className={`flex h-8 w-14 items-center justify-center rounded-full transition md:w-auto ${
-                        active ? 'bg-brand/12 md:bg-transparent' : ''
-                      }`}
-                    >
-                      <TabIcon id={item.id} />
-                    </span>
-                    <span className={`text-[11px] md:text-sm ${active ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </nav>
-        )}
       </header>
 
-      <main className="flex-1 px-4 py-4 pb-24 md:px-6 md:py-6 md:pb-8">
+      <main className="flex-1 px-4 py-4 pb-24">
         {state.status === 'loading' ? (
           <p className="py-10 text-center text-sm text-ink-2">Oturum kontrol ediliyor…</p>
         ) : state.status === 'signedOut' ? (
@@ -161,6 +131,37 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
           <ManageScreen />
         )}
       </main>
+
+      {!needsLogin && (
+        <nav className="fixed inset-x-0 bottom-0 z-30">
+          <div className="mx-auto flex max-w-3xl border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+            {tabs.map((item) => {
+              const active = currentTab === item.id
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setTab(item.id)}
+                  aria-current={active ? 'page' : undefined}
+                  className={`relative flex min-h-16 flex-1 flex-col items-center justify-center gap-0.5 transition ${
+                    active ? 'text-brand' : 'text-ink-2'
+                  }`}
+                >
+                  {active && <span className="absolute inset-x-5 top-0 h-[3px] rounded-b-full bg-accent" />}
+                  <span
+                    className={`flex h-8 w-14 items-center justify-center rounded-full transition ${
+                      active ? 'bg-brand/12' : ''
+                    }`}
+                  >
+                    <TabIcon id={item.id} />
+                  </span>
+                  <span className={`text-[11px] ${active ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </nav>
+      )}
     </div>
   )
 }
