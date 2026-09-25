@@ -97,7 +97,7 @@ export interface FirestoreSettings {
 /** Kulübün adı settings/features içinde; giriş ekranı metinleri oradan gelir. */
 export function toClubIdentity(raw: FirestoreSettings | undefined) {
   return {
-    primaryName: (raw?.loginTitlePrimary ?? 'SPORTFLOW').trim(),
+    primaryName: (raw?.loginTitlePrimary ?? 'ANADOLU SPOR').trim(),
     secondaryName: (raw?.loginTitleSecondary ?? '').trim(),
     description: (raw?.loginDescription ?? '').trim(),
   }

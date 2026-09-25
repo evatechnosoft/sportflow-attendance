@@ -49,8 +49,8 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
   const attendance = clone(seed.attendance ?? [])
   const overdue = new Set(seed.overdue ?? [])
   const clubIdentity = seed.clubIdentity ?? {
-    primaryName: 'SPORTFLOW',
-    secondaryName: 'DEMO KULÜBÜ',
+    primaryName: 'ANADOLU SPOR',
+    secondaryName: 'Yoklama',
     description: 'OKUL BAZLI YOKLAMA — ÖRNEK VERİ',
   }
 

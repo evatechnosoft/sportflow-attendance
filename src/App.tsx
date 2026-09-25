@@ -43,11 +43,11 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
               aria-hidden="true"
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent font-display text-lg font-bold text-bg"
             >
-              {monogram(club.data?.primaryName ?? 'SportFlow')}
+              {monogram(club.data?.primaryName ?? 'Anadolu Spor')}
             </span>
             <div className="min-w-0">
               <h1 className="truncate font-display text-lg font-bold uppercase leading-tight tracking-wide">
-                {club.data?.primaryName ?? 'SportFlow'}
+                {club.data?.primaryName ?? 'Anadolu Spor'}
               </h1>
               <div className="flex min-w-0 items-center gap-2">
                 {club.data?.secondaryName && (
