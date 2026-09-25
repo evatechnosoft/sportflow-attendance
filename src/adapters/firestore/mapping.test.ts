@@ -1,95 +1,170 @@
 import { describe, expect, it } from 'vitest'
 import {
-  fromAttendanceStatus,
+  buildAttendanceDoc,
+  chunks,
+  diffMemberships,
+  isOverdue,
+  parseSessionId,
+  primaryGuardianId,
+  recordsOf,
   sessionDocId,
   toAttendanceStatus,
-  dedupeGroups,
-  groupDisplayName,
-  schoolsFromGroups,
-  toBranches,
   toGroup,
   toPlayer,
-  buildAttendanceDoc,
+  toStudentGender,
+  type MembershipDoc,
 } from './mapping'
 
-describe('durum çevirisi', () => {
-  it('Türkçe durumları domain durumuna çevirir', () => {
-    expect(toAttendanceStatus('Geldi')).toBe('present')
-    expect(toAttendanceStatus('Gelmedi')).toBe('absent')
-    expect(toAttendanceStatus('Geç')).toBe('late')
-    expect(toAttendanceStatus('İzinli')).toBe('excused')
-  })
-
-  it('Belirsiz ve tanınmayan değer kayıt sayılmaz', () => {
-    expect(toAttendanceStatus('Belirsiz')).toBeNull()
-    expect(toAttendanceStatus(undefined)).toBeNull()
-    expect(toAttendanceStatus(42)).toBeNull()
-  })
-
-  it('çeviri çift yönlü tutarlıdır', () => {
+describe('toAttendanceStatus', () => {
+  it('İngilizce durumlar aynen geçer', () => {
     for (const status of ['present', 'absent', 'late', 'excused'] as const) {
-      expect(toAttendanceStatus(fromAttendanceStatus(status))).toBe(status)
+      expect(toAttendanceStatus(status)).toBe(status)
     }
   })
-})
 
-describe('toPlayer', () => {
-  it('fullName ad ve soyada bölünür', () => {
-    const player = toPlayer('a1', { fullName: 'Can Erdoğan', groupId: 'g1', status: 'approved' })
-    expect(player).toMatchObject({ firstName: 'Can', lastName: 'Erdoğan', status: 'active' })
-  })
-
-  it('çok parçalı isimde son parça soyadıdır', () => {
-    const player = toPlayer('a2', { fullName: 'Ayşe Nur Yıldız', groupId: 'g1' })
-    expect(player.firstName).toBe('Ayşe Nur')
-    expect(player.lastName).toBe('Yıldız')
-  })
-
-  it('"Grup - Ad Soyad" önekini atar', () => {
-    const player = toPlayer('a3', { fullName: 'U14 Kız - Deniz Kaya', groupId: 'g1' })
-    expect(player.firstName).toBe('Deniz')
-    expect(player.lastName).toBe('Kaya')
-  })
-
-  it('approved dışındaki sporcu pasiftir', () => {
-    expect(toPlayer('a4', { fullName: 'X Y', status: 'archived' }).status).toBe('inactive')
-    expect(toPlayer('a5', { fullName: 'X Y', status: 'pending' }).status).toBe('inactive')
-  })
-
-  it('birthYear tarihe çevrilir, yoksa boş kalır', () => {
-    expect(toPlayer('a6', { fullName: 'X Y', birthYear: 2012 }).birthDate).toBe('2012-01-01')
-    expect(toPlayer('a7', { fullName: 'X Y' }).birthDate).toBeUndefined()
+  it('tanınmayan değer kayıt sayılmaz', () => {
+    expect(toAttendanceStatus('Geldi')).toBeNull()
+    expect(toAttendanceStatus(undefined)).toBeNull()
+    expect(toAttendanceStatus(42)).toBeNull()
   })
 })
 
 describe('toGroup', () => {
-  it('gün bilgisi olmayan canlı grup boş takvimle gelir — uydurma gün üretilmez', () => {
-    expect(toGroup('g1', { name: 'U14', startTime: '17:00' }).schedule).toEqual([])
+  it('CRM grubunda ek alanlar yoksa branş boş, takvim boş gelir', () => {
+    expect(toGroup('g1', { name: 'U14', kind: 'training' })).toEqual({
+      id: 'g1',
+      name: 'U14',
+      branchId: '',
+      schoolId: undefined,
+      coachName: undefined,
+      schedule: [],
+    })
   })
 
-  it('okulu olmayan eski grubun okulu yoktur', () => {
-    expect(toGroup('g1', { name: 'U14' }).schoolId).toBeUndefined()
-  })
-
-  it('okul alanı varsa korunur', () => {
-    expect(toGroup('g1', { name: 'U14', schoolId: 's1' }).schoolId).toBe('s1')
+  it('yoklamanın ek alanları korunur', () => {
+    const schedule = [{ weekday: 2, startTime: '17:00', durationMinutes: 90 }]
+    const group = toGroup('g1', { name: 'U14', branchId: 'b1', schoolId: 's1', coachName: 'Ali', schedule })
+    expect(group).toMatchObject({ branchId: 'b1', schoolId: 's1', coachName: 'Ali', schedule })
   })
 })
 
-describe('sessionDocId', () => {
-  it('eski uygulamanın belge kimliği biçimini üretir', () => {
+const membership = (overrides: Partial<MembershipDoc>): MembershipDoc => ({
+  id: 'm1',
+  studentId: 's1',
+  groupId: 'g1',
+  joinedOn: '2026-09-01',
+  ...overrides,
+})
+
+describe('toPlayer', () => {
+  it('öğrenci + üyelikler + veli sporcuya çevrilir', () => {
+    const player = toPlayer(
+      's1',
+      { firstName: 'Can', lastName: 'Erdoğan', status: 'active', gender: 'male', birthDate: '2012-05-01' },
+      [membership({})],
+      { fullName: 'Ayşe Erdoğan', phone: '0555' },
+    )
+    expect(player).toEqual({
+      id: 's1',
+      firstName: 'Can',
+      lastName: 'Erdoğan',
+      birthDate: '2012-05-01',
+      gender: 'male',
+      status: 'active',
+      guardianName: 'Ayşe Erdoğan',
+      guardianPhone: '0555',
+      groupHistory: [{ groupId: 'g1', joinedOn: '2026-09-01' }],
+    })
+  })
+
+  it('active dışındaki durum pasiftir', () => {
+    expect(toPlayer('s1', { status: 'inactive' }, []).status).toBe('inactive')
+    expect(toPlayer('s1', {}, []).status).toBe('inactive')
+  })
+
+  it('dönem geçmişi yalnız o öğrencinin üyelikleri, joinedOn artan', () => {
+    const player = toPlayer('s1', { status: 'active' }, [
+      membership({ id: 'm2', groupId: 'g2', joinedOn: '2026-09-20' }),
+      membership({ id: 'm1', groupId: 'g1', joinedOn: '2026-09-01', leftOn: '2026-09-20' }),
+      membership({ id: 'm3', studentId: 's2', groupId: 'g3' }),
+    ])
+    expect(player.groupHistory).toEqual([
+      { groupId: 'g1', joinedOn: '2026-09-01', leftOn: '2026-09-20' },
+      { groupId: 'g2', joinedOn: '2026-09-20' },
+    ])
+  })
+})
+
+describe('toStudentGender', () => {
+  it("CRM'de olmayan 'other' yazılmaz", () => {
+    expect(toStudentGender('female')).toBe('female')
+    expect(toStudentGender('other')).toBeUndefined()
+  })
+})
+
+describe('primaryGuardianId', () => {
+  it('rank 1 veli önce gelir', () => {
+    const rows = [
+      { studentId: 's1', customerId: 'c2', rank: 2 },
+      { studentId: 's1', customerId: 'c1', rank: 1 },
+      { studentId: 's2', customerId: 'c3', rank: 1 },
+    ]
+    expect(primaryGuardianId(rows, 's1')).toBe('c1')
+    expect(primaryGuardianId(rows, 's9')).toBeUndefined()
+  })
+})
+
+describe('diffMemberships', () => {
+  it('grup değişimi: eski açık üyelik kapanır, yeni gruba üyelik açılır', () => {
+    const diff = diffMemberships(
+      [membership({ id: 'm1', groupId: 'g1' })],
+      [
+        { groupId: 'g1', joinedOn: '2026-09-01', leftOn: '2026-09-23' },
+        { groupId: 'g2', joinedOn: '2026-09-23' },
+      ],
+      '2026-09-25',
+    )
+    expect(diff).toEqual({
+      close: [{ id: 'm1', leftOn: '2026-09-23' }],
+      open: [{ groupId: 'g2', joinedOn: '2026-09-23' }],
+    })
+  })
+
+  it('değişmeyen geçmiş yazma üretmez', () => {
+    const diff = diffMemberships(
+      [membership({ id: 'm1', groupId: 'g1' })],
+      [{ groupId: 'g1', joinedOn: '2026-09-01' }],
+      '2026-09-25',
+    )
+    expect(diff).toEqual({ close: [], open: [] })
+  })
+
+  it('kapanış tarihi yoksa bugün yazılır, kapalı üyelik yeniden açılır', () => {
+    expect(diffMemberships([membership({ id: 'm1' })], [], '2026-09-25').close).toEqual([
+      { id: 'm1', leftOn: '2026-09-25' },
+    ])
+    const reopened = diffMemberships(
+      [membership({ id: 'm1', leftOn: '2026-09-10' })],
+      [
+        { groupId: 'g1', joinedOn: '2026-09-01', leftOn: '2026-09-10' },
+        { groupId: 'g1', joinedOn: '' },
+      ],
+      '2026-09-25',
+    )
+    expect(reopened).toEqual({ close: [], open: [{ groupId: 'g1', joinedOn: '2026-09-25' }] })
+  })
+})
+
+describe('oturum kimliği', () => {
+  it('attendance/{groupId}_{date} biçimi gidip gelir', () => {
     expect(sessionDocId('g1', '2026-09-21')).toBe('g1_2026-09-21')
-  })
-})
-
-describe('toBranches', () => {
-  it('branşları settings belgesinden okur', () => {
-    const branches = toBranches({ branches: [{ id: 'volleyball', name: 'Voleybol' }] })
-    expect(branches).toEqual([{ id: 'volleyball', name: 'Voleybol', slug: 'volleyball' }])
+    expect(parseSessionId('grp_a_2026-09-21')).toEqual({ groupId: 'grp_a', date: '2026-09-21' })
   })
 
-  it('settings yoksa boş liste döner', () => {
-    expect(toBranches(undefined)).toEqual([])
+  it('biçimsiz kimlik reddedilir', () => {
+    expect(parseSessionId('yok')).toBeNull()
+    expect(parseSessionId('_2026-09-21')).toBeNull()
+    expect(parseSessionId('g1_bugun')).toBeNull()
   })
 })
 
@@ -97,67 +172,64 @@ describe('buildAttendanceDoc', () => {
   const doc = buildAttendanceDoc({
     groupId: 'g1',
     date: '2026-09-21',
-    coachId: 'uid-1',
-    records: { a1: { status: 'Geldi', notes: '' } },
+    takenBy: 'koc@example.com',
+    marks: [
+      { playerId: 'a1', status: 'present' },
+      { playerId: 'a2', status: 'late', note: 'servis' },
+    ],
+    now: '2026-09-21T17:05:00.000Z',
   })
 
-  it('kuralların zorunlu tuttuğu beş alanı taşır', () => {
-    for (const key of ['groupId', 'coachId', 'date', 'createdAt', 'records']) {
-      expect(doc).toHaveProperty(key)
-    }
+  it('kuralların istediği alanları taşır', () => {
+    expect(doc).toMatchObject({
+      groupId: 'g1',
+      date: '2026-09-21',
+      takenBy: 'koc@example.com',
+      updatedAt: '2026-09-21T17:05:00.000Z',
+    })
   })
 
-  it('createdAt sayıdır ve type izinli değerdir', () => {
-    expect(typeof doc.createdAt).toBe('number')
-    expect(['practice', 'match']).toContain(doc.type)
-  })
-})
-
-describe('dedupeGroups', () => {
-  const make = (id: string, name: string, startTime?: string) => ({
-    id,
-    raw: { name, branchId: 'volleyball', startTime },
+  it('records öğrenci kimliğiyle anahtarlı; not yalnız varsa yazılır', () => {
+    expect(doc.records).toEqual({
+      a1: { status: 'present', markedAt: '2026-09-21T17:05:00.000Z' },
+      a2: { status: 'late', note: 'servis', markedAt: '2026-09-21T17:05:00.000Z' },
+    })
   })
 
-  it('aynı ad/branş/saat üçlüsü bir kez görünür', () => {
-    const groups = dedupeGroups([
-      make('g1', 'Mini Kız A', '09:00'),
-      make('g2', 'Mini Kız A', '09:00'),
-      make('g3', 'Mini Kız B', '10:00'),
-    ])
-    expect(groups.map((group) => group.id)).toEqual(['g1', 'g3'])
-  })
-
-  it('saati farklı olan aynı ad ayrı gruptur — schedule boş olsa da', () => {
-    const groups = dedupeGroups([make('g1', 'Midi Kız A', '11:00'), make('g2', 'Midi Kız A', '16:00')])
-    expect(groups).toHaveLength(2)
-    expect(groups.every((group) => group.schedule.length === 0)).toBe(true)
-  })
-
-  it('saatsiz mükerrer kayıtlar yine tek görünür', () => {
-    expect(dedupeGroups([make('g1', 'Yıldız Kız'), make('g2', 'Yıldız Kız')])).toHaveLength(1)
+  it('yazılan records geri okunur', () => {
+    expect(recordsOf(doc.records).map((row) => row.record.status)).toEqual(['present', 'late'])
   })
 })
 
-describe('groupDisplayName', () => {
-  it('adı boş grup saatiyle anılır', () => {
-    expect(groupDisplayName('', '09:00')).toBe('09:00 grubu')
-    expect(groupDisplayName(undefined, undefined)).toBe('(isimsiz grup)')
+describe('recordsOf', () => {
+  it('tanınmayan durum ve bozuk kayıt atlanır', () => {
+    const rows = recordsOf({ a1: { status: 'Geldi' }, a2: null, a3: { status: 'absent' } })
+    expect(rows).toEqual([{ playerId: 'a3', record: { status: 'absent', markedAt: '' } }])
   })
 
-  it('adı olan grubun adı korunur', () => {
-    expect(groupDisplayName('Yıldız Kız A', '17:00')).toBe('Yıldız Kız A')
+  it('records yoksa boş', () => {
+    expect(recordsOf(undefined)).toEqual([])
   })
 })
 
-describe('schoolsFromGroups', () => {
-  it('okul listesi gruplardan türetilir, schools koleksiyonu okunmaz', () => {
-    const groups = [
-      toGroup('g1', { name: 'A', schoolId: 'okul-1' }),
-      toGroup('g2', { name: 'B', schoolId: 'okul-1' }),
-      toGroup('g3', { name: 'C' }),
-    ]
-    // Okulsuz grup sahte "atanmamış" okul üretmez.
-    expect(schoolsFromGroups(groups)).toEqual([{ id: 'okul-1', name: 'okul-1' }])
+describe('isOverdue', () => {
+  const row = { planId: 'p1', dueDate: '2026-09-01', amount: 100_00, paidAmount: 0 }
+
+  it('vadesi geçmiş ve eksik ödenmiş taksit gecikmiştir', () => {
+    expect(isOverdue(row, '2026-09-25')).toBe(true)
+    expect(isOverdue({ ...row, paidAmount: 50_00 }, '2026-09-25')).toBe(true)
+  })
+
+  it('bugün vadeli ya da tam ödenmiş taksit gecikmiş değildir', () => {
+    expect(isOverdue(row, '2026-09-01')).toBe(false)
+    expect(isOverdue({ ...row, paidAmount: 100_00 }, '2026-09-25')).toBe(false)
+  })
+})
+
+describe('chunks', () => {
+  it("Firestore 'in' sınırı için 30'luk parçalar", () => {
+    const parts = chunks(Array.from({ length: 61 }, (_, index) => index))
+    expect(parts.map((part) => part.length)).toEqual([30, 30, 1])
+    expect(chunks([])).toEqual([])
   })
 })
