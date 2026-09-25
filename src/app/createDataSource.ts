@@ -32,7 +32,7 @@ export function createDataSource(env: ImportMetaEnv): DataSourceHandle {
   return {
     dataSource: createFirestoreDataSource(db, {
       allowWrites,
-      currentUserId: () => auth.currentUser?.uid ?? null,
+      currentUserEmail: () => auth.currentUser?.email ?? null,
     }),
     kind: 'firestore',
     writable: allowWrites,

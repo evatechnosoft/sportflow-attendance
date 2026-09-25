@@ -1,169 +1,214 @@
-import type { AttendanceStatus, Group, Player, School } from '../../domain/types'
+import type { AttendanceStatus, Gender, Group, GroupSpell, Player, ScheduleSlot } from '../../domain/types'
+import type { AttendanceMark } from '../../ports/repositories'
 
 /**
- * Anadolu Spor Firestore şeması ile bu uygulamanın domain'i arasındaki çeviri.
- * Eski şemada okul kavramı yok (athletes: groupId/branchId/coachId), yoklama
- * durumları Türkçe string. Çeviri saf tutulur ki testi ucuz olsun.
+ * CRM v2 Firestore sözleşmesi ile yoklama domain'i arasındaki çeviri
+ * (clubcrm docs/faz-b-kurgu.md § B3/B4 Firestore sözleşmesi). Kadro CRM'in:
+ * students + memberships + guardianships → customers. Çeviri saf tutulur ki testi ucuz olsun.
  */
 
-const STATUS_FROM_FIRESTORE: Record<string, AttendanceStatus> = {
-  Geldi: 'present',
-  Gelmedi: 'absent',
-  Geç: 'late',
-  İzinli: 'excused',
-}
+const STATUSES: readonly AttendanceStatus[] = ['present', 'absent', 'late', 'excused']
 
-const STATUS_TO_FIRESTORE: Record<AttendanceStatus, string> = {
-  present: 'Geldi',
-  absent: 'Gelmedi',
-  late: 'Geç',
-  excused: 'İzinli',
-}
-
-/** 'Belirsiz' ve tanınmayan değerler kayıt sayılmaz. */
+/** Tanınmayan değer kayıt sayılmaz. */
 export function toAttendanceStatus(value: unknown): AttendanceStatus | null {
-  return typeof value === 'string' ? (STATUS_FROM_FIRESTORE[value] ?? null) : null
+  return STATUSES.find((status) => status === value) ?? null
 }
 
-export function fromAttendanceStatus(status: AttendanceStatus): string {
-  return STATUS_TO_FIRESTORE[status]
-}
-
-export interface FirestoreAthlete {
-  fullName?: string
-  birthYear?: number
-  groupId?: string
-  parentName?: string
-  parentPhone?: string
-  status?: string
-}
-
-export function toPlayer(id: string, raw: FirestoreAthlete): Player {
-  const fullName = (raw.fullName ?? '').trim()
-  // Eski veride "Grup - Ad Soyad" biçimi de var; grup önekini at.
-  const withoutPrefix = fullName.includes(' - ')
-    ? fullName.split(' - ').slice(1).join(' - ')
-    : fullName
-  const parts = withoutPrefix.split(/\s+/).filter(Boolean)
-
-  return {
-    id,
-    firstName: parts.slice(0, -1).join(' ') || parts[0] || '(isimsiz)',
-    lastName: parts.length > 1 ? parts[parts.length - 1] : '',
-    birthDate: raw.birthYear ? `${raw.birthYear}-01-01` : undefined,
-    status: raw.status === 'approved' ? 'active' : 'inactive',
-    guardianName: raw.parentName,
-    guardianPhone: raw.parentPhone,
-    // Eski şemada dönem geçmişi yok; okunan kayıt tek açık dönem sayılır.
-    groupHistory: [{ groupId: raw.groupId ?? '', joinedOn: '' }],
-  }
-}
-
-export interface FirestoreGroup {
+export interface GroupDoc {
   name?: string
+  kind?: string
   branchId?: string
   schoolId?: string
-  coachId?: string
-  startTime?: string
-  sessionTime?: string
+  coachName?: string
+  schedule?: ScheduleSlot[]
 }
 
-export function toGroup(id: string, raw: FirestoreGroup): Group {
+/** CRM grubunda yoklamanın ek alanları yok: branş boş, takvim boş gelir. */
+export function toGroup(id: string, raw: GroupDoc): Group {
   return {
     id,
-    name: groupDisplayName(raw.name, startTimeOf(raw)),
+    name: raw.name ?? '',
     branchId: raw.branchId ?? '',
-    schoolId: raw.schoolId,
-    coachName: raw.coachId,
-    // Canlı grup belgesinde gün yok, yalnız saat var: uydurma gün üretmeyiz.
-    schedule: [],
+    schoolId: raw.schoolId || undefined,
+    coachName: raw.coachName || undefined,
+    schedule: raw.schedule ?? [],
   }
 }
 
-const startTimeOf = (raw: FirestoreGroup) => raw.startTime ?? raw.sessionTime
+export interface StudentDoc {
+  firstName?: string
+  lastName?: string
+  birthDate?: string
+  status?: string
+  gender?: string
+}
 
-/** Eski uygulamanın yoklama belge kimliği: groups ve tarih birleşimi. */
+export interface MembershipDoc {
+  id: string
+  studentId: string
+  groupId: string
+  joinedOn: string
+  leftOn?: string
+}
+
+export interface Guardian {
+  fullName?: string
+  phone?: string
+}
+
+/** Dönem geçmişi öğrencinin üyeliklerinden, joinedOn artan (boş = bilinmiyor, en başta). */
+export function toPlayer(
+  id: string,
+  raw: StudentDoc,
+  memberships: MembershipDoc[],
+  guardian?: Guardian,
+): Player {
+  return {
+    id,
+    firstName: raw.firstName ?? '',
+    lastName: raw.lastName ?? '',
+    birthDate: raw.birthDate || undefined,
+    gender: raw.gender === 'male' || raw.gender === 'female' ? raw.gender : undefined,
+    status: raw.status === 'active' ? 'active' : 'inactive',
+    guardianName: guardian?.fullName || undefined,
+    guardianPhone: guardian?.phone || undefined,
+    groupHistory: memberships
+      .filter((row) => row.studentId === id)
+      .sort((a, b) => a.joinedOn.localeCompare(b.joinedOn))
+      .map((row) => ({
+        groupId: row.groupId,
+        joinedOn: row.joinedOn,
+        ...(row.leftOn ? { leftOn: row.leftOn } : {}),
+      })),
+  }
+}
+
+/** CRM `Gender` yalnız male|female; 'other' yazılmaz. */
+export function toStudentGender(gender: Gender | undefined): 'male' | 'female' | undefined {
+  return gender === 'male' || gender === 'female' ? gender : undefined
+}
+
+/** Veli: rank 1 önce; yoksa ilk bulunan. */
+export function primaryGuardianId(
+  rows: { studentId: string; customerId: string; rank?: number }[],
+  studentId: string,
+): string | undefined {
+  return rows
+    .filter((row) => row.studentId === studentId)
+    .sort((a, b) => (a.rank ?? 9) - (b.rank ?? 9))[0]?.customerId
+}
+
+export interface MembershipDiff {
+  close: { id: string; leftOn: string }[]
+  open: { groupId: string; joinedOn: string }[]
+}
+
+/**
+ * Yeni groupHistory ile mevcut üyelikler arasındaki fark. Açık üyelik, yeni
+ * geçmişte o grubun açık dönemi yoksa kapanır; açık dönemin üyeliği yoksa açılır.
+ */
+export function diffMemberships(
+  current: MembershipDoc[],
+  next: GroupSpell[],
+  today: string,
+): MembershipDiff {
+  const openNext = next.filter((spell) => !spell.leftOn)
+  const openNow = current.filter((row) => !row.leftOn)
+  return {
+    close: openNow
+      .filter((row) => !openNext.some((spell) => spell.groupId === row.groupId))
+      .map((row) => ({
+        id: row.id,
+        leftOn:
+          next.find((spell) => spell.groupId === row.groupId && spell.leftOn)?.leftOn ?? today,
+      })),
+    open: openNext
+      .filter((spell) => !openNow.some((row) => row.groupId === spell.groupId))
+      .map((spell) => ({ groupId: spell.groupId, joinedOn: spell.joinedOn || today })),
+  }
+}
+
+/** Yoklama belge kimliği: `attendance/{groupId}_{date}`. */
 export function sessionDocId(groupId: string, date: string): string {
   return `${groupId}_${date}`
 }
 
-export interface FirestoreSettings {
-  branches?: { id?: string; name?: string; slug?: string }[]
-  loginTitlePrimary?: string
-  loginTitleSecondary?: string
-  loginDescription?: string
+/** Tarih her zaman son parça; grup kimliğinde `_` olsa da bozulmaz. */
+export function parseSessionId(sessionId: string): { groupId: string; date: string } | null {
+  const cut = sessionId.lastIndexOf('_')
+  const groupId = sessionId.slice(0, cut)
+  const date = sessionId.slice(cut + 1)
+  return cut > 0 && /^\d{4}-\d{2}-\d{2}$/.test(date) ? { groupId, date } : null
 }
 
-/** Kulübün adı settings/features içinde; giriş ekranı metinleri oradan gelir. */
-export function toClubIdentity(raw: FirestoreSettings | undefined) {
-  return {
-    primaryName: (raw?.loginTitlePrimary ?? 'ANADOLU SPOR').trim(),
-    secondaryName: (raw?.loginTitleSecondary ?? '').trim(),
-    description: (raw?.loginDescription ?? '').trim(),
-  }
-}
-
-/** Branşlar ayrı koleksiyonda değil, settings/features belgesindeki dizide tutulur. */
-export function toBranches(raw: FirestoreSettings | undefined) {
-  return (raw?.branches ?? []).map((branch, index) => ({
-    id: branch.id ?? `branch-${index + 1}`,
-    name: branch.name ?? '(isimsiz branş)',
-    slug: branch.slug ?? branch.id ?? `branch-${index + 1}`,
-  }))
-}
-
-export interface AttendanceDocInput {
-  groupId: string
-  date: string
-  coachId: string
-  records: Record<string, { status: string; notes: string }>
-  createdAt?: number
+export interface AttendanceRecord {
+  status: AttendanceStatus
+  note?: string
+  markedAt: string
 }
 
 /**
- * firestore.rules § isValidAttendance: groupId, coachId, date, createdAt, records
- * alanlarının beşi de zorunlu; createdAt sayı, type verilirse practice|match olmalı.
+ * firestore.rules § isValidAttendance: groupId, date, records (map) ve
+ * takenBy == giriş e-postası (küçük harf). `setDoc(..., {merge: true})` ile yazılır.
  */
-export function buildAttendanceDoc(input: AttendanceDocInput) {
+export function buildAttendanceDoc(input: {
+  groupId: string
+  date: string
+  takenBy: string
+  marks: AttendanceMark[]
+  now: string
+}) {
+  const records: Record<string, AttendanceRecord> = {}
+  for (const mark of input.marks) {
+    records[mark.playerId] = {
+      status: mark.status,
+      ...(mark.note ? { note: mark.note } : {}),
+      markedAt: input.now,
+    }
+  }
   return {
     groupId: input.groupId,
     date: input.date,
-    coachId: input.coachId,
-    createdAt: input.createdAt ?? Date.now(),
-    type: 'practice' as const,
-    records: input.records,
+    takenBy: input.takenBy,
+    updatedAt: input.now,
+    records,
   }
 }
 
-/**
- * Canlı veride aynı grup defalarca oluşmuş (demo seed + mükerrer kayıt):
- * 32 belgenin çoğu aynı ad/branş/saat üçlüsü. Seçicide bir kez görünsün.
- * Saat domain Group'unda tutulmadığı için tekilleştirme ham belge üzerinden yapılır.
- * ponytail: görüntüde tekilleştirme; asıl temizlik Firestore tarafında yapılmalı.
- */
-export function dedupeGroups(rows: { id: string; raw: FirestoreGroup }[]): Group[] {
-  const seen = new Map<string, Group>()
-  for (const { id, raw } of rows) {
-    const name = groupDisplayName(raw.name, startTimeOf(raw))
-    const key = `${name.toLocaleLowerCase('tr')}|${raw.branchId ?? ''}|${startTimeOf(raw) ?? ''}`
-    if (!seen.has(key)) seen.set(key, toGroup(id, raw))
+/** records haritası → sayılabilir kayıtlar; tanınmayan durum atlanır. */
+export function recordsOf(raw: unknown): { playerId: string; record: AttendanceRecord }[] {
+  const records = (raw ?? {}) as Record<string, { status?: unknown; note?: unknown; markedAt?: unknown }>
+  const rows: { playerId: string; record: AttendanceRecord }[] = []
+  for (const [playerId, value] of Object.entries(records)) {
+    const status = toAttendanceStatus(value?.status)
+    if (!status) continue
+    rows.push({
+      playerId,
+      record: {
+        status,
+        ...(typeof value.note === 'string' && value.note ? { note: value.note } : {}),
+        markedAt: typeof value.markedAt === 'string' ? value.markedAt : '',
+      },
+    })
   }
-  return [...seen.values()]
+  return rows
 }
 
-/** İsimsiz gruplar saatleriyle anılır (eski veride adı boş kayıtlar var). */
-export function groupDisplayName(name: string | undefined, startTime?: string): string {
-  const trimmed = (name ?? '').trim()
-  if (trimmed) return trimmed
-  return startTime ? `${startTime} grubu` : '(isimsiz grup)'
+export interface InstallmentDoc {
+  planId: string
+  dueDate: string
+  amount: number
+  paidAmount: number
 }
 
-/**
- * Canlı şemada `schools` koleksiyonu yok ve kurallar tanımsız yolları reddediyor
- * (`match /{document=**} allow read: if false`). Okul listesi bu yüzden gruplardan
- * türetilir; ayrı koleksiyon okunmaz.
- */
-export function schoolsFromGroups(groups: Group[]): School[] {
-  const ids = new Set(groups.flatMap((group) => (group.schoolId ? [group.schoolId] : [])))
-  return [...ids].map((id) => ({ id, name: id }))
+/** Vadesi geçmiş (bugünden önce) ve tam ödenmemiş taksit. */
+export function isOverdue(row: InstallmentDoc, today: string): boolean {
+  return row.dueDate < today && row.paidAmount < row.amount
+}
+
+/** Firestore `in` sorgusu en fazla 30 değer alır. */
+export function chunks<T>(items: T[], size = 30): T[][] {
+  const out: T[][] = []
+  for (let index = 0; index < items.length; index += size) out.push(items.slice(index, index + size))
+  return out
 }

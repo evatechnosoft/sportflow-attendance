@@ -39,6 +39,19 @@ export const emptyCounts = (): Record<AttendanceStatus, number> => ({
   excused: 0,
 })
 
+/** Kural 1-2: gün 1-7 aralığında ve gün + saat çifti tekil. */
+export const requireValidSchedule = (schedule: ScheduleSlot[]) => {
+  const seen = new Set<string>()
+  for (const slot of schedule) {
+    if (!Number.isInteger(slot.weekday) || slot.weekday < 1 || slot.weekday > 7) {
+      throw invalid('Antrenman günü', `${slot.weekday} — 1-7 aralığında olmalı`)
+    }
+    const key = `${slot.weekday}|${slot.startTime}`
+    if (seen.has(key)) throw duplicate('Grup', 'gün + saat', key)
+    seen.add(key)
+  }
+}
+
 /** In-memory adapter. Ağ yok, kalıcılık yok — UI'ı gerçek veri kaynağından önce çalıştırır. */
 export function createMockDataSource(seed: MockSeed = {}): DataSource {
   const schools = clone(seed.schools ?? [])
@@ -58,19 +71,6 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
 
   let counter = 0
   const nextId = (prefix: string) => `${prefix}-${++counter}`
-
-  /** Kural 1-2: gün 1-7 aralığında ve gün + saat çifti tekil. */
-  const requireValidSchedule = (schedule: ScheduleSlot[]) => {
-    const seen = new Set<string>()
-    for (const slot of schedule) {
-      if (!Number.isInteger(slot.weekday) || slot.weekday < 1 || slot.weekday > 7) {
-        throw invalid('Antrenman günü', `${slot.weekday} — 1-7 aralığında olmalı`)
-      }
-      const key = `${slot.weekday}|${slot.startTime}`
-      if (seen.has(key)) throw duplicate('Grup', 'gün + saat', key)
-      seen.add(key)
-    }
-  }
 
   /** Sporcunun o gruptaki dönemleri — açık dönem üyelik, kapalı dönem geçmiştir. */
   const spellsIn = (player: Player, groupId: Id) =>
