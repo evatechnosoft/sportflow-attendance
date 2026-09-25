@@ -39,12 +39,7 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
       <header className="sticky top-0 z-10 border-b-[3px] border-accent bg-header px-4 py-3 text-on-header">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
-            <span
-              aria-hidden="true"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent font-display text-lg font-bold text-bg"
-            >
-              {monogram(club.data?.primaryName ?? 'Anadolu Spor')}
-            </span>
+            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" className="h-11 w-11 shrink-0" />
             <div className="min-w-0">
               <h1 className="truncate font-display text-lg font-bold uppercase leading-tight tracking-wide">
                 {club.data?.primaryName ?? 'Anadolu Spor'}
@@ -142,16 +137,6 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
   )
 }
 
-/** Kulüp adından baş harf rozeti: ilk iki kelimenin baş harfleri. */
-function monogram(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word.charAt(0))
-    .join('')
-    .toLocaleUpperCase('tr-TR')
-}
 
 const iconProps = {
   width: 22,
