@@ -9,7 +9,7 @@ import { useOverdue } from './useOverdue'
 import { GroupSheet } from './GroupSheet'
 import { dayLabel, shiftDay, shortDate, weekdayOf, WEEKDAY_LABEL } from './date'
 import { hasSlotOn } from '../manage/schedule'
-import { useDialog } from '../../app/useDialog'
+import { Sheet } from '../../app/Sheet'
 import type { ScheduleSlot } from '../../domain/types'
 import { isDirty, marksFromRows, STATUSES, STATUS_LABEL, summarize, type Marks } from './summary'
 
@@ -51,9 +51,9 @@ export function AttendanceScreen() {
 
   const overdue = useOverdue(groupId)
   const [marks, setMarks] = useState<Marks>({})
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [groupAnchor, setGroupAnchor] = useState<HTMLElement | null>(null)
   const [toast, setToast] = useState<Toast | null>(null)
-  const [timeOpen, setTimeOpen] = useState(false)
+  const [timeAnchor, setTimeAnchor] = useState<HTMLElement | null>(null)
   const dateInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -109,7 +109,7 @@ export function AttendanceScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['session', groupId, date] })
       queryClient.invalidateQueries({ queryKey: ['group-options'] })
-      setTimeOpen(false)
+      setTimeAnchor(null)
     },
   })
 
@@ -157,7 +157,9 @@ export function AttendanceScreen() {
       {/* 1. Başlık: grup seçici */}
       <button
         type="button"
-        onClick={() => setSheetOpen(true)}
+        onClick={(event) => setGroupAnchor(event.currentTarget)}
+        aria-haspopup="dialog"
+        aria-expanded={groupAnchor !== null}
         disabled={!groups.data?.length}
         className="flex h-14 w-full items-center justify-between gap-3 text-left disabled:opacity-50"
       >
@@ -180,11 +182,12 @@ export function AttendanceScreen() {
       </button>
 
       <GroupSheet
-        open={sheetOpen}
+        open={groupAnchor !== null}
+        anchor={groupAnchor}
         groups={groups.data ?? []}
         groupId={groupId}
         onSelect={setGroupId}
-        onClose={() => setSheetOpen(false)}
+        onClose={() => setGroupAnchor(null)}
       />
 
       {/* 2. Tarih */}
@@ -224,7 +227,9 @@ export function AttendanceScreen() {
         {session.data && (
           <button
             type="button"
-            onClick={() => setTimeOpen(true)}
+            onClick={(event) => setTimeAnchor(event.currentTarget)}
+            aria-haspopup="dialog"
+            aria-expanded={timeAnchor !== null}
             className="min-h-11 shrink-0 rounded-2xl bg-surface-2 px-3 text-xs font-semibold text-ink-2"
           >
             {`Saat: ${session.data.startTime ?? '—'}`}
@@ -301,7 +306,7 @@ export function AttendanceScreen() {
         </p>
       )}
 
-      <ul className="space-y-2 pb-40">
+      <ul className="grid items-start gap-2 pb-40 lg:grid-cols-2">
         {players.data?.map((player) => (
           <AttendanceRow
             key={player.id}
@@ -323,7 +328,7 @@ export function AttendanceScreen() {
 
       {/* 6. Sticky kaydet */}
       {dirty && (
-        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 mx-auto max-w-3xl px-4">
+        <div className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom))] z-20 mx-auto max-w-3xl px-4 md:bottom-6 md:max-w-md">
           <div className="rounded-[20px] border border-line bg-surface/90 p-2 backdrop-blur">
             <button
               type="button"
@@ -340,17 +345,18 @@ export function AttendanceScreen() {
       )}
 
       <TimeSheet
-        open={timeOpen}
+        open={timeAnchor !== null}
+        anchor={timeAnchor}
         startTime={session.data?.startTime ?? ''}
         canRepeat={Boolean(slotOfDay)}
         busy={setTime.isPending}
         onSubmit={(startTime, forever) => setTime.mutate({ startTime, forever })}
-        onClose={() => setTimeOpen(false)}
+        onClose={() => setTimeAnchor(null)}
       />
 
       {/* 7-8. Tek toast yeri */}
       {toast && (
-        <div className="fixed inset-x-0 bottom-[calc(148px+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-3xl justify-center px-4">
+        <div className="fixed inset-x-0 bottom-[calc(148px+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-3xl justify-center px-4 md:bottom-28">
           <div className="flex items-center gap-3 rounded-full bg-present px-4 py-2 text-sm font-medium text-bg">
             <span>{toast.text}</span>
             {toast.undo && (
@@ -380,15 +386,16 @@ function TimeSheet({
   busy,
   onSubmit,
   onClose,
+  anchor,
 }: {
   open: boolean
+  anchor: HTMLElement | null
   startTime: string
   canRepeat: boolean
   busy: boolean
   onSubmit: (startTime: string, forever: boolean) => void
   onClose: () => void
 }) {
-  const ref = useDialog(open)
   const [value, setValue] = useState(startTime)
 
   useEffect(() => {
@@ -396,37 +403,35 @@ function TimeSheet({
   }, [open, startTime])
 
   return (
-    <dialog ref={ref} className="sheet" onClose={onClose} onClick={onClose}>
-      <div className="rounded-t-[26px] bg-surface p-4" onClick={(event) => event.stopPropagation()}>
-        <p className="mb-3 font-display text-lg font-semibold">Oturum saati</p>
-        <input
-          type="time"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          aria-label="Oturum saati"
-          className="mb-3 min-h-11 w-full rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
-        />
-        <div className="flex flex-col gap-2">
+    <Sheet open={open} onClose={onClose} anchor={anchor}>
+      <p className="mb-3 font-display text-lg font-semibold">Oturum saati</p>
+      <input
+        type="time"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        aria-label="Oturum saati"
+        className="mb-3 min-h-11 w-full rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm"
+      />
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          disabled={busy || !value}
+          onClick={() => onSubmit(value, false)}
+          className="min-h-[52px] w-full rounded-2xl bg-brand font-medium text-bg disabled:opacity-40"
+        >
+          Yalnız bu oturum
+        </button>
+        {canRepeat && (
           <button
             type="button"
             disabled={busy || !value}
-            onClick={() => onSubmit(value, false)}
-            className="min-h-[52px] w-full rounded-2xl bg-brand font-medium text-bg disabled:opacity-40"
+            onClick={() => onSubmit(value, true)}
+            className="min-h-[52px] w-full rounded-2xl bg-surface-2 font-medium text-ink disabled:opacity-40"
           >
-            Yalnız bu oturum
+            Bundan sonra hep
           </button>
-          {canRepeat && (
-            <button
-              type="button"
-              disabled={busy || !value}
-              onClick={() => onSubmit(value, true)}
-              className="min-h-[52px] w-full rounded-2xl bg-surface-2 font-medium text-ink disabled:opacity-40"
-            >
-              Bundan sonra hep
-            </button>
-          )}
-        </div>
+        )}
       </div>
-    </dialog>
+    </Sheet>
   )
 }
