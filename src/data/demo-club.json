@@ -1,0 +1,140 @@
+{
+  "club": "Anadolu Spor",
+  "branch": { "id": "branch_voleybol", "name": "Voleybol", "slug": "voleybol" },
+  "groups": [
+    { "id": "grp_1200", "name": "12:00–13:00", "startTime": "12:00", "durationMinutes": 60, "weekdays": [6, 7], "coachId": "usr_coach_1" },
+    { "id": "grp_1300", "name": "13:00–14:00", "startTime": "13:00", "durationMinutes": 60, "weekdays": [6, 7], "coachId": "usr_coach_2" }
+  ],
+  "staff": [
+    { "id": "usr_admin", "displayName": "Hakan Özdemir", "email": "hakan.ozdemir@example.com", "role": "admin" },
+    { "id": "usr_officer", "displayName": "Nur Aksoy", "email": "nur.aksoy@example.com", "role": "officer" },
+    { "id": "usr_coach_1", "displayName": "Serkan Yılmaz", "email": "serkan.yilmaz@example.com", "role": "coach" },
+    { "id": "usr_coach_2", "displayName": "Ebru Kaplan", "email": "ebru.kaplan@example.com", "role": "coach" }
+  ],
+  "families": [
+    {
+      "id": "fam_01",
+      "address": "Bağlarbaşı Mah. Çınar Sok. No:12 D:3, Üsküdar/İstanbul",
+      "payment": "onTime",
+      "guardians": [
+        { "id": "cus_01a", "fullName": "Kemal Aydın", "phone": "05321410101", "email": "kemal.aydin@example.com" },
+        { "id": "cus_01b", "fullName": "Sevgi Aydın", "phone": "05421410102", "email": "sevgi.aydin@example.com" }
+      ],
+      "children": [
+        { "id": "stu_01", "firstName": "Ege", "lastName": "Aydın", "birthDate": "2013-03-11", "gender": "male", "groupId": "grp_1200", "attendance": "PPPPLPPPPPPP", "discounts": [] },
+        { "id": "stu_02", "firstName": "Defne", "lastName": "Aydın", "birthDate": "2015-07-22", "gender": "female", "groupId": "grp_1300", "attendance": "PPAPPPPPEPPP", "discounts": ["sibling"] },
+        { "id": "stu_03", "firstName": "Alp", "lastName": "Aydın", "birthDate": "2017-01-05", "gender": "male", "groupId": "grp_1300", "attendance": "PPAPPPLPEPPP", "discounts": ["sibling"] }
+      ]
+    },
+    {
+      "id": "fam_02",
+      "address": "Caferağa Mah. Moda Cad. No:48 D:5, Kadıköy/İstanbul",
+      "payment": "early",
+      "guardians": [
+        { "id": "cus_02a", "fullName": "Leyla Şahin", "phone": "05331420201", "email": "leyla.sahin@example.com" }
+      ],
+      "children": [
+        { "id": "stu_04", "firstName": "Zeynep", "lastName": "Şahin", "birthDate": "2012-10-02", "gender": "female", "groupId": "grp_1200", "attendance": "PPPPPPPPPPPP", "discounts": [] },
+        { "id": "stu_05", "firstName": "Mert", "lastName": "Şahin", "birthDate": "2014-05-18", "gender": "male", "groupId": "grp_1200", "attendance": "PPPLPPPPAPPP", "discounts": ["sibling"] }
+      ]
+    },
+    {
+      "id": "fam_03",
+      "address": "Acıbadem Mah. Tekin Sok. No:7 D:2, Kadıköy/İstanbul",
+      "payment": "onTime",
+      "guardians": [
+        { "id": "cus_03a", "fullName": "Murat Koç", "phone": "05351430301", "email": "murat.koc@example.com" },
+        { "id": "cus_03b", "fullName": "Esra Koç", "phone": "05361430302", "email": "esra.koc@example.com" }
+      ],
+      "children": [
+        { "id": "stu_06", "firstName": "Elif", "lastName": "Koç", "birthDate": "2013-12-09", "gender": "female", "groupId": "grp_1200", "attendance": "PPPPPPLPPPPP", "discounts": ["teacher"] },
+        { "id": "stu_07", "firstName": "Arda", "lastName": "Koç", "birthDate": "2016-02-27", "gender": "male", "groupId": "grp_1300", "attendance": "PLPPPAPPPPLP", "discounts": ["sibling", "teacher"] }
+      ]
+    },
+    {
+      "id": "fam_04",
+      "address": "Kısıklı Mah. Alemdağ Cad. No:103 D:9, Üsküdar/İstanbul",
+      "payment": "onTime",
+      "guardians": [
+        { "id": "cus_04a", "fullName": "Hülya Yurt", "phone": "05441440401", "email": "hulya.yurt@example.com" }
+      ],
+      "children": [
+        { "id": "stu_08", "firstName": "Nehir", "lastName": "Yurt", "birthDate": "2012-06-14", "gender": "female", "groupId": "grp_1200", "attendance": "PPPPPPPPPLPP", "discounts": ["scholarship"] }
+      ]
+    },
+    {
+      "id": "fam_05",
+      "address": "Suadiye Mah. Bağdat Cad. No:410 D:12, Kadıköy/İstanbul",
+      "payment": "late1",
+      "guardians": [
+        { "id": "cus_05a", "fullName": "Serdar Polat", "phone": "05301450501", "email": "serdar.polat@example.com" },
+        { "id": "cus_05b", "fullName": "Gamze Polat", "phone": "05551450502", "email": "gamze.polat@example.com" }
+      ],
+      "children": [
+        { "id": "stu_09", "firstName": "Kerem", "lastName": "Polat", "birthDate": "2014-09-30", "gender": "male", "groupId": "grp_1300", "attendance": "PPPAPPPPAAPA", "discounts": [] },
+        { "id": "stu_10", "firstName": "Ada", "lastName": "Polat", "birthDate": "2017-04-12", "gender": "female", "groupId": "grp_1300", "attendance": "PPPAPPPPAAPP", "discounts": ["sibling"] }
+      ]
+    },
+    {
+      "id": "fam_06",
+      "address": "Ünalan Mah. Ayazma Cad. No:22 D:4, Üsküdar/İstanbul",
+      "payment": "onTime",
+      "guardians": [
+        { "id": "cus_06a", "fullName": "Canan Erdem", "phone": "05381460601", "email": "canan.erdem@example.com" }
+      ],
+      "children": [
+        { "id": "stu_11", "firstName": "Yiğit", "lastName": "Erdem", "birthDate": "2013-08-19", "gender": "male", "groupId": "grp_1200", "attendance": "PPPPPEPPPPPL", "discounts": [] },
+        { "id": "stu_12", "firstName": "Duru", "lastName": "Erdem", "birthDate": "2015-11-03", "gender": "female", "groupId": "grp_1200", "attendance": "PPPPPEPPPPPP", "discounts": ["sibling"] },
+        { "id": "stu_13", "firstName": "Eylül", "lastName": "Erdem", "birthDate": "2018-02-14", "gender": "female", "groupId": "grp_1300", "attendance": "PAPPPEPPLPPP", "discounts": ["sibling"] }
+      ]
+    },
+    {
+      "id": "fam_07",
+      "address": "Göztepe Mah. Tütüncü Mehmet Efendi Cad. No:31 D:6, Kadıköy/İstanbul",
+      "payment": "late2",
+      "guardians": [
+        { "id": "cus_07a", "fullName": "Oğuz Tekin", "phone": "05071470701", "email": "oguz.tekin@example.com" }
+      ],
+      "children": [
+        { "id": "stu_14", "firstName": "Deniz", "lastName": "Tekin", "birthDate": "2012-01-25", "gender": "male", "groupId": "grp_1200", "attendance": "PPAPPAPAPAAA", "discounts": ["special"] }
+      ]
+    },
+    {
+      "id": "fam_08",
+      "address": "Altunizade Mah. Kuşbakışı Cad. No:15 D:8, Üsküdar/İstanbul",
+      "payment": "onTime",
+      "guardians": [
+        { "id": "cus_08a", "fullName": "Burcu Güneş", "phone": "05301480801", "email": "burcu.gunes@example.com" },
+        { "id": "cus_08b", "fullName": "Tolga Güneş", "phone": "05321480802", "email": "tolga.gunes@example.com" }
+      ],
+      "children": [
+        { "id": "stu_15", "firstName": "Asya", "lastName": "Güneş", "birthDate": "2014-03-08", "gender": "female", "groupId": "grp_1300", "attendance": "PPPPPPPPPPPP", "discounts": [] },
+        { "id": "stu_16", "firstName": "Emir", "lastName": "Güneş", "birthDate": "2016-07-01", "gender": "male", "groupId": "grp_1300", "attendance": "PPLPPPPAPPPP", "discounts": ["sibling"] }
+      ]
+    },
+    {
+      "id": "fam_09",
+      "address": "Fenerbahçe Mah. Kalamış Cad. No:64 D:1, Kadıköy/İstanbul",
+      "payment": "onTime",
+      "guardians": [
+        { "id": "cus_09a", "fullName": "Selim Arslan", "phone": "05421490901", "email": "selim.arslan@example.com" }
+      ],
+      "children": [
+        { "id": "stu_17", "firstName": "Kaan", "lastName": "Arslan", "birthDate": "2013-05-27", "gender": "male", "groupId": "grp_1200", "attendance": "PPPPAPPPPPLP", "discounts": [] },
+        { "id": "stu_18", "firstName": "Lina", "lastName": "Arslan", "birthDate": "2015-09-15", "gender": "female", "groupId": "grp_1300", "attendance": "PPPPAPPPPPPP", "discounts": ["sibling"] }
+      ]
+    },
+    {
+      "id": "fam_10",
+      "address": "Burhaniye Mah. Abdullahağa Cad. No:9 D:3, Üsküdar/İstanbul",
+      "payment": "partial",
+      "guardians": [
+        { "id": "cus_10a", "fullName": "Pınar Uçar", "phone": "05061501001", "email": "pinar.ucar@example.com" }
+      ],
+      "children": [
+        { "id": "stu_19", "firstName": "İpek", "lastName": "Uçar", "birthDate": "2012-04-06", "gender": "female", "groupId": "grp_1200", "attendance": "PPPPPPAPPPPE", "discounts": [] },
+        { "id": "stu_20", "firstName": "Berk", "lastName": "Uçar", "birthDate": "2014-12-20", "gender": "male", "groupId": "grp_1300", "attendance": "PPPLPPAPPPPE", "discounts": ["sibling"] }
+      ]
+    }
+  ]
+}

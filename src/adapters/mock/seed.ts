@@ -1,139 +1,137 @@
-import raw from '../../data/players.seed.json'
-import type {
-  Attendance,
-  Branch,
-  Group,
-  GroupSpell,
-  Player,
-  School,
-  Session,
-} from '../../domain/types'
+import demo from '../../data/demo-club.json'
+import type { Attendance, AttendanceStatus, Branch, Group, Player, Session } from '../../domain/types'
 import type { MockSeed } from './mockDataSource'
 
-interface RawPlayer {
-  ParentName: string
-  Phone: string
-  PlayerName: string
-  PlayerLastName: string
-  PlayerBirthDate: string
-  PlayerGender: string
+/**
+ * Shared demo fixture: the same file lives in clubcrm (`src/data/demo-club.json`),
+ * so both apps show the same club, groups, students and attendance.
+ */
+export interface DemoClub {
+  club: string
+  branch: Branch
+  groups: Array<{
+    id: string
+    name: string
+    startTime: string
+    durationMinutes: number
+    weekdays: number[]
+    coachId: string
+  }>
+  staff: Array<{ id: string; displayName: string; email: string; role: string }>
+  families: Array<{
+    id: string
+    address: string
+    payment: 'onTime' | 'early' | 'late1' | 'late2' | 'partial'
+    guardians: Array<{ id: string; fullName: string; phone: string; email: string }>
+    children: Array<{
+      id: string
+      firstName: string
+      lastName: string
+      birthDate: string
+      gender: 'male' | 'female'
+      groupId: string
+      /** One letter per past session, oldest first: P present, A absent, L late, E excused. */
+      attendance: string
+      discounts: string[]
+    }>
+  }>
 }
 
-const SCHOOLS = ['Atatürk Ortaokulu', 'Cumhuriyet İlkokulu', 'Fatih Anadolu Lisesi']
-const BRANCHES = [
-  { name: 'Voleybol', slug: 'voleybol' },
-  { name: 'Basketbol', slug: 'basketbol' },
-  { name: 'Hentbol', slug: 'hentbol' },
-]
+export const DEMO_CLUB = demo as DemoClub
 
-/** Kaç hafta geriye oturum üretilsin. */
-const WEEKS_BACK = 4
+const STATUS: Record<string, AttendanceStatus> = { P: 'present', A: 'absent', L: 'late', E: 'excused' }
 
-/** Demo sezon takvimi: dönem başlangıcı, önceki sezon ve ayrılma tarihi. */
-const SEASON_START = '2026-09-01'
-const PAST_SEASON = '2025-09-01'
-const LEFT_ON = '2026-09-15'
-const SECOND_GROUP_ON = '2026-09-10'
+/** Families whose dues are behind (CRM decides the same from the same fixture). */
+const LATE_PAYMENTS = new Set(['late1', 'late2', 'partial'])
 
-/** Deterministik mock veri: aynı girdi → aynı çıktı, test ve demo tekrar edilebilir olsun. */
-export function buildSeed(today = new Date('2026-09-19')): MockSeed {
-  const schools: School[] = SCHOOLS.map((name, index) => ({ id: `school-${index + 1}`, name }))
-  const branches: Branch[] = BRANCHES.map((branch, index) => ({
-    ...branch,
-    id: `branch-${index + 1}`,
+const localIso = (date: Date) => date.toLocaleDateString('en-CA')
+
+const shift = (iso: string, days: number) => {
+  const date = new Date(`${iso}T00:00:00Z`)
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+const isoWeekday = (iso: string) => new Date(`${iso}T00:00:00Z`).getUTCDay() || 7
+
+/** Season start: first day of the month three months before `today` (CRM plans start there too). */
+export function seasonStart(today: string): string {
+  const [year, month] = today.split('-').map(Number)
+  return new Date(Date.UTC(year, month - 1 - 3, 1)).toISOString().slice(0, 10)
+}
+
+/** The last `count` training dates strictly before `today`, oldest first. */
+export function pastSessionDates(today: string, weekdays: number[], count: number): string[] {
+  const dates: string[] = []
+  for (let day = shift(today, -1); dates.length < count; day = shift(day, -1)) {
+    if (weekdays.includes(isoWeekday(day))) dates.unshift(day)
+  }
+  return dates
+}
+
+/** Demo data relative to `today`: same input, same output. */
+export function buildSeed(today = new Date()): MockSeed {
+  const todayIso = localIso(today)
+  const joinedOn = seasonStart(todayIso)
+  const coachName = (id: string) => DEMO_CLUB.staff.find((user) => user.id === id)?.displayName
+
+  const groups: Group[] = DEMO_CLUB.groups.map((group) => ({
+    id: group.id,
+    name: group.name,
+    branchId: DEMO_CLUB.branch.id,
+    coachName: coachName(group.coachId),
+    schedule: group.weekdays.map((weekday) => ({
+      weekday,
+      startTime: group.startTime,
+      durationMinutes: group.durationMinutes,
+    })),
   }))
 
-  const groups: Group[] = []
-  schools.forEach((school, schoolIndex) => {
-    branches.forEach((branch, branchIndex) => {
-      // Her okulda her branş yok: 3x3'ün köşegen dışı bir kısmı boş kalsın, gerçeğe yakın.
-      if ((schoolIndex + branchIndex) % 3 === 2) return
-      groups.push({
-        id: `group-${school.id}-${branch.id}`,
-        name: `${branch.name} U${12 + schoolIndex * 2}`,
-        schoolId: school.id,
-        branchId: branch.id,
-        coachName: ['Serkan Demir', 'Elif Kaya', 'Murat Şahin'][(schoolIndex + branchIndex) % 3],
-        schedule: [{ weekday: 2 + branchIndex, startTime: '17:00', durationMinutes: 90 }],
-      })
-    })
-  })
+  const players: Player[] = DEMO_CLUB.families.flatMap((family) =>
+    family.children.map((child) => ({
+      id: child.id,
+      firstName: child.firstName,
+      lastName: child.lastName,
+      birthDate: child.birthDate,
+      gender: child.gender,
+      status: 'active' as const,
+      guardianName: family.guardians[0].fullName,
+      guardianPhone: family.guardians[0].phone,
+      groupHistory: [{ groupId: child.groupId, joinedOn }],
+    })),
+  )
 
-  const players: Player[] = (raw as RawPlayer[]).map((row, index) => {
-    const groupId = groups[index % groups.length].id
-    const left = index % 17 === 0
-    // Her 5'te bir sporcu başka bir gruptan gelmiş olsun: ekran geçmişi boş göstermesin.
-    const previousGroupId = index % 5 === 2 ? groups[(index + 1) % groups.length].id : undefined
-    const history: GroupSpell[] = previousGroupId
-      ? [{ groupId: previousGroupId, joinedOn: PAST_SEASON, leftOn: SEASON_START }]
-      : []
-    history.push({
-      groupId,
-      joinedOn: SEASON_START,
-      ...(left ? { leftOn: LEFT_ON } : {}),
-    })
-    // Her 11'de bir aktif sporcu ikinci bir grupta daha oynar (ör. maç kadrosu).
-    if (!left && index % 11 === 4) {
-      history.push({ groupId: groups[(index + 2) % groups.length].id, joinedOn: SECOND_GROUP_ON })
-    }
-    return {
-      id: `player-${index + 1}`,
-      firstName: row.PlayerName,
-      lastName: row.PlayerLastName,
-      birthDate: row.PlayerBirthDate,
-      gender: row.PlayerGender === 'female' ? 'female' : 'male',
-      status: left ? ('inactive' as const) : ('active' as const),
-      guardianName: row.ParentName,
-      guardianPhone: row.Phone,
-      groupHistory: history,
-    }
-  })
-
+  const children = DEMO_CLUB.families.flatMap((family) => family.children)
   const sessions: Session[] = []
   const attendance: Attendance[] = []
-  groups.forEach((group) => {
-    const weekday = group.schedule[0]?.weekday ?? 2
-    for (let week = WEEKS_BACK; week >= 1; week--) {
-      const date = isoDateOfWeekday(today, weekday, week)
-      const session: Session = {
-        id: `session-${group.id}-${date}`,
-        groupId: group.id,
-        date,
-        startTime: group.schedule[0]?.startTime,
-      }
+  for (const group of DEMO_CLUB.groups) {
+    const members = children.filter((child) => child.groupId === group.id)
+    const sessionCount = Math.max(...members.map((child) => child.attendance.length))
+    pastSessionDates(todayIso, group.weekdays, sessionCount).forEach((date, index) => {
+      const session: Session = { id: `session-${group.id}-${date}`, groupId: group.id, date, startTime: group.startTime }
       sessions.push(session)
+      // Marked at the end of training, Istanbul time.
+      const markedAt = new Date(
+        new Date(`${date}T${group.startTime}:00+03:00`).getTime() + group.durationMinutes * 60_000,
+      ).toISOString()
+      for (const child of members) {
+        attendance.push({ sessionId: session.id, playerId: child.id, status: STATUS[child.attendance[index]], markedAt })
+      }
+    })
+  }
 
-      players
-        .filter((player) =>
-          player.groupHistory.some((spell) => spell.groupId === group.id && !spell.leftOn),
-        )
-        .forEach((player, index) => {
-          const roll = (index + week) % 7
-          attendance.push({
-            sessionId: session.id,
-            playerId: player.id,
-            status: roll === 0 ? 'absent' : roll === 3 ? 'late' : 'present',
-            markedAt: `${date}T18:30:00.000Z`,
-          })
-        })
-    }
-  })
+  const overdue = DEMO_CLUB.families
+    .filter((family) => LATE_PAYMENTS.has(family.payment))
+    .flatMap((family) => family.children.map((child) => child.id))
 
-  // Demo: ilk grubun 2. ve 5. aktif sporcusunun aidatı gecikmiş.
-  const overdue = players
-    .filter((player) =>
-      player.groupHistory.some((spell) => spell.groupId === groups[0].id && !spell.leftOn),
-    )
-    .filter((_, index) => index === 1 || index === 4)
-    .map((player) => player.id)
-
-  return { schools, branches, groups, players, sessions, attendance, overdue }
-}
-
-/** `weeksAgo` hafta önceki, verilen ISO haftagününe denk gelen tarih. */
-function isoDateOfWeekday(today: Date, weekday: number, weeksAgo: number): string {
-  const date = new Date(today)
-  const currentIso = date.getDay() === 0 ? 7 : date.getDay()
-  date.setDate(date.getDate() - (currentIso - weekday) - weeksAgo * 7)
-  return date.toISOString().slice(0, 10)
+  return {
+    clubIdentity: { primaryName: 'ANADOLU SPOR', secondaryName: 'Yoklama', description: 'VOLEYBOL — ÖRNEK VERİ' },
+    schools: [],
+    branches: [DEMO_CLUB.branch],
+    groups,
+    players,
+    sessions,
+    attendance,
+    overdue,
+  }
 }
