@@ -42,6 +42,9 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
   const needsLogin = state.status !== 'off' && state.status !== 'ready'
   // Coaches only take attendance; the CRM link is for admin/memur views.
   const showManage = state.status === 'off' || (state.status === 'ready' && viewRole !== 'koc')
+  // Group/settings definitions are memur+; a coach view falls back to attendance.
+  const tabs = viewRole === 'koc' ? TABS.filter((item) => item.id !== 'manage') : TABS
+  const currentTab: TabId = tabs.some((item) => item.id === tab) ? tab : 'attendance'
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col">
@@ -118,11 +121,11 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
           <AccessDenied message="Bu hesabın kulüpte yetkisi yok." email={state.email} onSignOut={() => void signOutUser()} />
         ) : state.status === 'error' ? (
           <AccessDenied message={`Yetki okunamadı: ${state.message}`} onSignOut={() => void signOutUser()} />
-        ) : tab === 'attendance' ? (
+        ) : currentTab === 'attendance' ? (
           <AttendanceScreen />
-        ) : tab === 'history' ? (
+        ) : currentTab === 'history' ? (
           <HistoryScreen onPick={() => setTab('attendance')} />
-        ) : tab === 'students' ? (
+        ) : currentTab === 'students' ? (
           <StudentsScreen />
         ) : (
           <ManageScreen />
@@ -132,8 +135,8 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
       {!needsLogin && (
         <nav className="fixed inset-x-0 bottom-0 z-30">
           <div className="mx-auto flex max-w-3xl border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-            {TABS.map((item) => {
-              const active = tab === item.id
+            {tabs.map((item) => {
+              const active = currentTab === item.id
               return (
                 <button
                   key={item.id}

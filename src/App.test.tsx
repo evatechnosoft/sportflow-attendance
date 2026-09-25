@@ -76,6 +76,17 @@ describe('App giriş ve roller', () => {
     expect(screen.getByText('Elif Kaya')).toBeDefined()
     expect(screen.queryByRole('link', { name: 'Yönetim' })).toBeNull()
     expect(screen.queryByLabelText('Görünüm')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Tanımlar' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Sporcular' })).toBeDefined()
+  })
+
+  it('Tanımlar açıkken koç görünümüne geçilirse sekme gizlenir, Yoklama açılır', async () => {
+    renderApp(ready(['admin', 'memur', 'koc']))
+    await userEvent.click(screen.getByRole('button', { name: 'Tanımlar' }))
+    expect(screen.getByRole('button', { name: 'Tanımlar' }).getAttribute('aria-current')).toBe('page')
+    await userEvent.selectOptions(screen.getByLabelText('Görünüm'), 'koc')
+    expect(screen.queryByRole('button', { name: 'Tanımlar' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Yoklama' }).getAttribute('aria-current')).toBe('page')
   })
 
   it('admin Yönetim bağlantısını görür; koç görünümüne geçince gizlenir', async () => {
