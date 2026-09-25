@@ -59,6 +59,13 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
           </div>
 
           <div className="flex items-center gap-1">
+            {/* ponytail: shown to everyone until B2 roles; then admin/memur only. */}
+            <a
+              href="/yonetim/"
+              className="flex min-h-11 items-center px-2 text-xs font-semibold text-on-header-2 underline-offset-2 transition hover:text-on-header hover:underline"
+            >
+              Yönetim
+            </a>
             <button
               type="button"
               onClick={cycle}
