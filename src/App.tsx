@@ -126,7 +126,7 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
         ) : currentTab === 'history' ? (
           <HistoryScreen onPick={() => setTab('attendance')} />
         ) : currentTab === 'students' ? (
-          <StudentsScreen />
+          <StudentsScreen readOnly={viewRole === 'koc'} />
         ) : (
           <ManageScreen />
         )}

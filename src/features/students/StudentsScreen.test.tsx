@@ -8,7 +8,7 @@ import { SelectionProvider } from '../../app/selection'
 import { createMockDataSource } from '../../adapters/mock/mockDataSource'
 import type { DataSource } from '../../ports/repositories'
 
-async function setup() {
+async function setup({ readOnly = false } = {}) {
   const db: DataSource = createMockDataSource()
   const school = await db.schools.create({ name: 'Atatürk Ortaokulu' })
   const branch = await db.branches.create({ name: 'Voleybol', slug: 'voleybol' })
@@ -51,7 +51,7 @@ async function setup() {
     <QueryClientProvider client={client}>
       <DataSourceProvider value={db}>
         <SelectionProvider>
-          <StudentsScreen />
+          <StudentsScreen readOnly={readOnly} />
         </SelectionProvider>
       </DataSourceProvider>
     </QueryClientProvider>,
@@ -69,6 +69,16 @@ async function act(user: ReturnType<typeof userEvent.setup>, name: string, actio
 
 describe('StudentsScreen', () => {
   afterEach(cleanup)
+
+  it('salt okunur (koç): liste görünür, ekle/işlem/geri al düğmeleri yok', async () => {
+    await setup({ readOnly: true })
+
+    await screen.findByText('Ada Yıldız')
+    expect(screen.getByText('Deniz Ak')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Sporcu ekle/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Ada Yıldız işlemleri' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Geri al' })).toBeNull()
+  })
 
   it('grubun aktif sporcularını listeler, ayrılanları katlanır bölümde tutar', async () => {
     await setup()

@@ -80,6 +80,13 @@ describe('App giriş ve roller', () => {
     expect(screen.getByRole('button', { name: 'Sporcular' })).toBeDefined()
   })
 
+  it('koç Sporcular sekmesinde sporcu ekleyemez', async () => {
+    renderApp(ready(['koc']))
+    await userEvent.click(screen.getByRole('button', { name: 'Sporcular' }))
+    expect(await screen.findByText(/aktif/)).toBeDefined()
+    expect(screen.queryByRole('button', { name: /Sporcu ekle/ })).toBeNull()
+  })
+
   it('Tanımlar açıkken koç görünümüne geçilirse sekme gizlenir, Yoklama açılır', async () => {
     renderApp(ready(['admin', 'memur', 'koc']))
     await userEvent.click(screen.getByRole('button', { name: 'Tanımlar' }))
