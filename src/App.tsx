@@ -4,8 +4,9 @@ import { AttendanceScreen } from './features/attendance/AttendanceScreen'
 import { HistoryScreen } from './features/attendance/HistoryScreen'
 import { ManageScreen } from './features/manage/ManageScreen'
 import { StudentsScreen } from './features/students/StudentsScreen'
-import { LoginScreen } from './features/auth/LoginScreen'
-import { useFirebaseAuth } from './app/auth'
+import { AccessDenied, LoginScreen } from './features/auth/LoginScreen'
+import { staffReader, useStaffAuth, useViewRole } from './app/auth'
+import { STAFF_ROLE_LABEL, type StaffRole } from './app/staffAccess'
 import type { DataSourceHandle } from './app/createDataSource'
 import { initFirebase, readFirebaseEnv } from './adapters/firestore/firebase'
 import { useDataSource } from './app/dataSource'
@@ -21,18 +22,29 @@ const TABS = [
 type TabId = (typeof TABS)[number]['id']
 
 const firebaseConfig = readFirebaseEnv(import.meta.env)
-const auth = firebaseConfig ? initFirebase(firebaseConfig).auth : null
+const firebase = firebaseConfig ? initFirebase(firebaseConfig) : null
+const readStaff = firebase ? staffReader(firebase.db) : null
+/** Google sign-in with local data (until B3); a Firestore data source always needs it. */
+const AUTH_ON = import.meta.env.VITE_AUTH === 'google'
+const NO_ROLES: StaffRole[] = []
 
 export default function App({ handle }: { handle: DataSourceHandle }) {
   const [tab, setTab] = useState<TabId>('attendance')
   const db = useDataSource()
   const { mode, cycle } = useTheme()
   const club = useQuery({ queryKey: ['club-identity'], queryFn: () => db.settings.clubIdentity() })
-  const { user, loading, error, signIn, signOutUser } = useFirebaseAuth(
-    handle.requiresAuth ? auth : null,
+  const { state, signIn, signOutUser } = useStaffAuth(
+    handle.requiresAuth || AUTH_ON ? (firebase?.auth ?? null) : null,
+    readStaff,
   )
+  const [viewRole, setViewRole] = useViewRole(state.status === 'ready' ? state.access.roles : NO_ROLES)
 
-  const needsLogin = handle.requiresAuth && !user
+  const needsLogin = state.status !== 'off' && state.status !== 'ready'
+  // Coaches only take attendance; the CRM link is for admin/memur views.
+  const showManage = state.status === 'off' || (state.status === 'ready' && viewRole !== 'koc')
+  // Group/settings definitions are memur+; a coach view falls back to attendance.
+  const tabs = viewRole === 'koc' ? TABS.filter((item) => item.id !== 'manage') : TABS
+  const currentTab: TabId = tabs.some((item) => item.id === tab) ? tab : 'attendance'
 
   return (
     <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col">
@@ -54,13 +66,14 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
           </div>
 
           <div className="flex items-center gap-1">
-            {/* ponytail: shown to everyone until B2 roles; then admin/memur only. */}
-            <a
-              href="/yonetim/"
-              className="flex min-h-11 items-center px-2 text-xs font-semibold text-on-header-2 underline-offset-2 transition hover:text-on-header hover:underline"
-            >
-              Yönetim
-            </a>
+            {showManage && (
+              <a
+                href="/yonetim/"
+                className="flex min-h-11 items-center px-2 text-xs font-semibold text-on-header-2 underline-offset-2 transition hover:text-on-header hover:underline"
+              >
+                Yönetim
+              </a>
+            )}
             <button
               type="button"
               onClick={cycle}
@@ -69,35 +82,51 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
             >
               <ThemeIcon mode={mode} />
             </button>
-            {user && (
-              <button
-                type="button"
-                onClick={signOutUser}
-                className="min-h-11 px-2 text-xs text-on-header-2 underline-offset-2 hover:underline"
-              >
-                Çıkış
-              </button>
-            )}
           </div>
         </div>
+        {state.status === 'ready' && viewRole && (
+          <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-on-header-2">
+            <span className="min-w-0 flex-1 truncate">{state.displayName}</span>
+            {state.access.roles.length > 1 && (
+              <select
+                aria-label="Görünüm"
+                value={viewRole}
+                onChange={(event) => setViewRole(event.target.value)}
+                className="min-h-9 rounded-lg border border-on-header-2 bg-header px-2 text-xs font-semibold text-on-header"
+              >
+                {state.access.roles.map((role) => (
+                  <option key={role} value={role}>
+                    {STAFF_ROLE_LABEL[role]}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              type="button"
+              onClick={() => void signOutUser()}
+              className="min-h-9 px-2 underline-offset-2 hover:text-on-header hover:underline"
+            >
+              Çıkış
+            </button>
+          </div>
+        )}
       </header>
 
       <main className="flex-1 px-4 py-4 pb-24">
-        {loading ? (
+        {state.status === 'loading' ? (
           <p className="py-10 text-center text-sm text-ink-2">Oturum kontrol ediliyor…</p>
-        ) : needsLogin ? (
-          <LoginScreen
-            onSignIn={signIn}
-            error={error}
-            club={club.data}
-            projectId={import.meta.env.VITE_FIREBASE_PROJECT_ID}
-          />
-        ) : tab === 'attendance' ? (
+        ) : state.status === 'signedOut' ? (
+          <LoginScreen onSignIn={() => void signIn()} error={state.error} />
+        ) : state.status === 'noAccess' ? (
+          <AccessDenied message="Bu hesabın kulüpte yetkisi yok." email={state.email} onSignOut={() => void signOutUser()} />
+        ) : state.status === 'error' ? (
+          <AccessDenied message={`Yetki okunamadı: ${state.message}`} onSignOut={() => void signOutUser()} />
+        ) : currentTab === 'attendance' ? (
           <AttendanceScreen />
-        ) : tab === 'history' ? (
+        ) : currentTab === 'history' ? (
           <HistoryScreen onPick={() => setTab('attendance')} />
-        ) : tab === 'students' ? (
-          <StudentsScreen />
+        ) : currentTab === 'students' ? (
+          <StudentsScreen readOnly={viewRole === 'koc'} />
         ) : (
           <ManageScreen />
         )}
@@ -106,8 +135,8 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
       {!needsLogin && (
         <nav className="fixed inset-x-0 bottom-0 z-30">
           <div className="mx-auto flex max-w-3xl border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-            {TABS.map((item) => {
-              const active = tab === item.id
+            {tabs.map((item) => {
+              const active = currentTab === item.id
               return (
                 <button
                   key={item.id}

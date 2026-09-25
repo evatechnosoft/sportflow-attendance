@@ -28,7 +28,8 @@ type Pending =
 
 const fullName = (player: Player) => `${player.firstName} ${player.lastName}`
 
-export function StudentsScreen() {
+/** `readOnly`: coach view — list only; roster writes are memur+ (Firestore rules). */
+export function StudentsScreen({ readOnly = false }: { readOnly?: boolean }) {
   const db = useDataSource()
   const queryClient = useQueryClient()
   const groups = useGroupOptions()
@@ -150,16 +151,18 @@ export function StudentsScreen() {
         <p className="mb-3 rounded-xl bg-absent-soft px-4 py-2 text-sm text-absent">{error}</p>
       )}
 
-      <button
-        type="button"
-        onClick={() => setAdding((prev) => !prev)}
-        disabled={!groupId}
-        className="mb-3 mt-2 min-h-11 w-full rounded-2xl border-2 border-dashed border-accent/40 bg-accent-soft px-4 text-sm font-bold text-accent disabled:opacity-50"
-      >
-        + Sporcu ekle
-      </button>
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={() => setAdding((prev) => !prev)}
+          disabled={!groupId}
+          className="mb-3 mt-2 min-h-11 w-full rounded-2xl border-2 border-dashed border-accent/40 bg-accent-soft px-4 text-sm font-bold text-accent disabled:opacity-50"
+        >
+          + Sporcu ekle
+        </button>
+      )}
 
-      {adding && <AddForm onSubmit={(input) => add.mutate(input)} onInvalid={setError} />}
+      {adding && !readOnly && <AddForm onSubmit={(input) => add.mutate(input)} onInvalid={setError} />}
 
       <ul className="space-y-2">
         {active.map((player) => (
@@ -167,6 +170,7 @@ export function StudentsScreen() {
             key={player.id}
             player={player}
             overdue={overdue.has(player.id)}
+            readOnly={readOnly}
             open={menuFor === player.id}
             onToggle={() => setMenuFor((prev) => (prev === player.id ? null : player.id))}
             onMove={() => startPick(player, 'move')}
@@ -196,14 +200,16 @@ export function StudentsScreen() {
                 <span className="min-w-0 flex-1 truncate font-medium text-ink-2">
                   {fullName(player)}
                 </span>
-                <button
-                  type="button"
-                  disabled={patch.isPending}
-                  onClick={() => patch.mutate(joinGroup(player, groupId, todayIso()))}
-                  className="min-h-11 shrink-0 rounded-xl bg-brand px-4 text-sm font-medium text-bg disabled:opacity-40"
-                >
-                  Geri al
-                </button>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    disabled={patch.isPending}
+                    onClick={() => patch.mutate(joinGroup(player, groupId, todayIso()))}
+                    className="min-h-11 shrink-0 rounded-xl bg-brand px-4 text-sm font-medium text-bg disabled:opacity-40"
+                  >
+                    Geri al
+                  </button>
+                )}
               </li>
             ))}
           </ul>
@@ -251,9 +257,11 @@ function StudentRow({
   onJoin,
   onLeave,
   overdue,
+  readOnly,
 }: {
   player: Player
   overdue: boolean
+  readOnly: boolean
   open: boolean
   onToggle: () => void
   onMove: () => void
@@ -290,17 +298,19 @@ function StudentRow({
             </span>
           )}
         </span>
-        <button
-          type="button"
-          aria-label={`${fullName(player)} işlemleri`}
-          aria-expanded={open}
-          onClick={onToggle}
-          className="h-11 w-11 shrink-0 rounded-full text-lg font-bold text-ink-2 hover:bg-surface-2"
-        >
-          ⋯
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            aria-label={`${fullName(player)} işlemleri`}
+            aria-expanded={open}
+            onClick={onToggle}
+            className="h-11 w-11 shrink-0 rounded-full text-lg font-bold text-ink-2 hover:bg-surface-2"
+          >
+            ⋯
+          </button>
+        )}
       </div>
-      {open && (
+      {open && !readOnly && (
         <div className="flex flex-wrap gap-1 border-t border-line p-1">
           <button
             type="button"
