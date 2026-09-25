@@ -45,8 +45,8 @@ export function Sheet({
       }
       const rect = anchor.getBoundingClientRect()
       const width = Math.min(Math.max(rect.width, 320), 448, window.innerWidth - GAP * 2)
-      // Left-align with the trigger; right-align when that would overflow the viewport.
-      const start = rect.left + width > window.innerWidth - GAP ? rect.right - width : rect.left
+      // Grow away from the nearer viewport edge so the popover stays over the content column.
+      const start = rect.left > window.innerWidth / 2 ? rect.right - width : rect.left
       const left = Math.min(Math.max(start, GAP), window.innerWidth - width - GAP)
       node.setAttribute('data-anchored', '')
       node.style.width = `${width}px`
