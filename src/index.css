@@ -178,3 +178,20 @@ dialog.sheet {
 dialog.sheet::backdrop {
   background: rgb(0 0 0 / 0.45);
 }
+/* Masaüstü: tetikleyicisiz sayfa ortada modal; tetikleyicili olan onun altında (konumu Sheet.tsx yazar). */
+@media (min-width: 768px) {
+  dialog.sheet {
+    margin: auto;
+    max-width: 28rem;
+  }
+  dialog.sheet[data-anchored] {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    max-width: none;
+    overflow: auto;
+  }
+  dialog.sheet[data-anchored]::backdrop {
+    background: rgb(0 0 0 / 0.15);
+  }
+}

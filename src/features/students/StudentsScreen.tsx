@@ -41,6 +41,8 @@ export function StudentsScreen({ readOnly = false }: { readOnly?: boolean }) {
   const [menuFor, setMenuFor] = useState<Id | null>(null)
   const [pickFor, setPickFor] = useState<{ player: Player; kind: 'move' | 'join' } | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+  // Header trigger anchors the picker on desktop; row actions open it centered.
+  const [groupAnchor, setGroupAnchor] = useState<HTMLElement | null>(null)
   const [pending, setPending] = useState<Pending | null>(null)
 
   useEffect(() => {
@@ -116,6 +118,7 @@ export function StudentsScreen({ readOnly = false }: { readOnly?: boolean }) {
 
   const startPick = (player: Player, kind: 'move' | 'join') => {
     setPickFor({ player, kind })
+    setGroupAnchor(null)
     setSheetOpen(true)
   }
 
@@ -124,10 +127,13 @@ export function StudentsScreen({ readOnly = false }: { readOnly?: boolean }) {
       {/* Başlık: listelenen grubu değiştirir — Yoklama ekranıyla aynı seçici. */}
       <button
         type="button"
-        onClick={() => {
+        onClick={(event) => {
           setPickFor(null)
+          setGroupAnchor(event.currentTarget)
           setSheetOpen(true)
         }}
+        aria-haspopup="dialog"
+        aria-expanded={sheetOpen && pickFor === null}
         disabled={!groups.data?.length}
         className="flex h-14 w-full items-center justify-between gap-3 text-left disabled:opacity-50"
       >
@@ -218,6 +224,7 @@ export function StudentsScreen({ readOnly = false }: { readOnly?: boolean }) {
 
       <GroupSheet
         open={sheetOpen}
+        anchor={groupAnchor}
         groups={groups.data ?? []}
         groupId={groupId}
         onSelect={(id) => {
