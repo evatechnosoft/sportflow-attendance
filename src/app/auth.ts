@@ -1,46 +1,124 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { FirebaseError } from 'firebase/app'
 import {
   GoogleAuthProvider,
+  getRedirectResult,
   onAuthStateChanged,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   type Auth,
-  type User,
 } from 'firebase/auth'
+import { doc, getDoc, type Firestore } from 'firebase/firestore'
+import {
+  pickViewRole,
+  readViewRole,
+  resolveAccess,
+  storeViewRole,
+  type StaffAccess,
+  type StaffRole,
+} from './staffAccess'
 
-export interface AuthState {
-  user: User | null
-  loading: boolean
-  error: string
+// Kept identical in clubcrm and sportflow (src/app/auth.ts).
+
+export type StaffAuthState =
+  /** Auth not configured: local mode, no sign-in. */
+  | { status: 'off' }
+  | { status: 'loading' }
+  | { status: 'signedOut'; error: string }
+  | { status: 'noAccess'; email: string }
+  | { status: 'error'; message: string }
+  | { status: 'ready'; email: string; displayName: string; access: StaffAccess }
+
+export function staffReader(db: Firestore) {
+  return async (emailLower: string): Promise<unknown> => {
+    const snapshot = await getDoc(doc(db, 'staff', emailLower))
+    return snapshot.exists() ? snapshot.data() : null
+  }
 }
 
-/** Firestore kuralları imzalı kullanıcı istiyor; giriş olmadan hiçbir koleksiyon okunmaz. */
-export function useFirebaseAuth(auth: Auth | null): AuthState & {
-  signIn: () => Promise<void>
-  signOutUser: () => Promise<void>
-} {
-  const [state, setState] = useState<AuthState>({ user: null, loading: Boolean(auth), error: '' })
+const message = (cause: unknown, fallback: string) => (cause instanceof Error ? cause.message : fallback)
+
+/** Popup first; on phones that block popups, fall back to a full-page redirect. */
+async function signInWithGoogle(auth: Auth): Promise<void> {
+  const provider = new GoogleAuthProvider()
+  try {
+    await signInWithPopup(auth, provider)
+  } catch (cause) {
+    if (!(cause instanceof FirebaseError)) throw cause
+    if (cause.code === 'auth/popup-blocked') return signInWithRedirect(auth, provider)
+    if (cause.code === 'auth/popup-closed-by-user' || cause.code === 'auth/cancelled-popup-request') return
+    throw cause
+  }
+}
+
+/**
+ * Google sign-in + role from staff/{emailLower}. Only verified e-mails get a
+ * role; the rules enforce the same, the role here only shapes the view.
+ */
+export function useStaffAuth(auth: Auth | null, readStaff: ((emailLower: string) => Promise<unknown>) | null) {
+  const [state, setState] = useState<StaffAuthState>(auth ? { status: 'loading' } : { status: 'off' })
 
   useEffect(() => {
+    if (!auth || !readStaff) return
+    let latest = 0
+    getRedirectResult(auth).catch((cause: unknown) =>
+      setState({ status: 'signedOut', error: message(cause, 'Giriş başarısız') }),
+    )
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      const run = ++latest
+      if (!user) return setState({ status: 'signedOut', error: '' })
+      if (!user.email || !user.emailVerified) return setState({ status: 'noAccess', email: user.email ?? '' })
+      const email = user.email
+      setState({ status: 'loading' })
+      resolveAccess(email, readStaff).then(
+        (access) => {
+          if (run !== latest) return
+          setState(
+            access
+              ? { status: 'ready', email: email.toLowerCase(), displayName: access.displayName ?? user.displayName ?? email, access }
+              : { status: 'noAccess', email },
+          )
+        },
+        (cause: unknown) => {
+          if (run === latest) setState({ status: 'error', message: message(cause, 'Yetki okunamadı') })
+        },
+      )
+    })
+    return () => {
+      latest = -1
+      unsubscribe()
+    }
+  }, [auth, readStaff])
+
+  const signIn = useCallback(async () => {
     if (!auth) return
-    return onAuthStateChanged(auth, (user) => setState({ user, loading: false, error: '' }))
+    try {
+      await signInWithGoogle(auth)
+    } catch (cause) {
+      setState({ status: 'signedOut', error: message(cause, 'Giriş başarısız') })
+    }
   }, [auth])
 
-  return {
-    ...state,
-    signIn: async () => {
-      if (!auth) return
-      try {
-        await signInWithPopup(auth, new GoogleAuthProvider())
-      } catch (cause) {
-        setState((prev) => ({
-          ...prev,
-          error: cause instanceof Error ? cause.message : 'Giriş başarısız',
-        }))
-      }
+  const signOutUser = useCallback(async () => {
+    if (auth) await signOut(auth)
+  }, [auth])
+
+  return { state, signIn, signOutUser }
+}
+
+/** The remembered view role, never one the person does not own. */
+export function useViewRole(owned: readonly StaffRole[]) {
+  const [requested, setRequested] = useState<string | null>(readViewRole)
+  const viewRole = pickViewRole(owned, requested)
+  const setViewRole = useCallback(
+    (role: string) => {
+      const allowed = owned.find((candidate) => candidate === role)
+      if (!allowed) return
+      storeViewRole(allowed)
+      setRequested(allowed)
     },
-    signOutUser: async () => {
-      if (auth) await signOut(auth)
-    },
-  }
+    [owned],
+  )
+  return [viewRole, setViewRole] as const
 }
