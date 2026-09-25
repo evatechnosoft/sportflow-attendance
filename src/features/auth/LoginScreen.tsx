@@ -15,7 +15,7 @@ export function LoginScreen({
     <div className="flex min-h-[70vh] flex-col items-center justify-center gap-6 px-4 text-center">
       <div>
         <h2 className="font-display text-3xl font-semibold tracking-tight">
-          {club?.primaryName ?? 'SportFlow'}
+          {club?.primaryName ?? 'Anadolu Spor'}
           {club?.secondaryName && <span className="block text-brand">{club.secondaryName}</span>}
         </h2>
         <p className="mt-2 text-xs font-medium tracking-widest text-ink-3">
