@@ -4,6 +4,7 @@ import {
   chunks,
   diffMemberships,
   isOverdue,
+  openGroupIds,
   parseSessionId,
   primaryGuardianId,
   recordsOf,
@@ -92,6 +93,20 @@ describe('toPlayer', () => {
       { groupId: 'g1', joinedOn: '2026-09-01', leftOn: '2026-09-20' },
       { groupId: 'g2', joinedOn: '2026-09-20' },
     ])
+  })
+})
+
+describe('openGroupIds', () => {
+  it('yalnız açık üyelikler, tekil ve sıralı', () => {
+    expect(
+      openGroupIds([
+        { groupId: 'g2' },
+        { groupId: 'g1', leftOn: '2026-09-01' },
+        { groupId: 'g3' },
+        { groupId: 'g2' },
+      ]),
+    ).toEqual(['g2', 'g3'])
+    expect(openGroupIds([])).toEqual([])
   })
 })
 
