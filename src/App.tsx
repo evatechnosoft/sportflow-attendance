@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AttendanceScreen } from './features/attendance/AttendanceScreen'
 import { HistoryScreen } from './features/attendance/HistoryScreen'
@@ -11,6 +11,8 @@ import type { DataSourceHandle } from './app/createDataSource'
 import { initFirebase, readFirebaseEnv } from './adapters/firestore/firebase'
 import { useDataSource } from './app/dataSource'
 import { THEME_LABEL, useTheme, type ThemeMode } from './app/theme'
+import { createFirestoreAnnouncements } from './announcements/announcements'
+import { AnnouncementsContext } from './announcements/CoachAnnouncements'
 
 const TABS = [
   { id: 'attendance', label: 'Yoklama' },
@@ -37,6 +39,12 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
     readStaff,
   )
   const viewRole = state.status === 'ready' ? state.access.roles[0] ?? null : null
+  const author = state.status === 'ready' ? { email: state.email, name: state.displayName } : null
+  const announcements = useMemo(
+    () => (firebase && author ? createFirestoreAnnouncements(firebase.db, () => author) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [author?.email],
+  )
 
   const needsLogin = state.status !== 'off' && state.status !== 'ready'
   // Coaches only take attendance; the CRM link is for admin/memur views.
@@ -99,6 +107,7 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
         )}
       </header>
 
+      <AnnouncementsContext.Provider value={announcements}>
       <main className="flex-1 px-4 py-4 pb-24">
         {state.status === 'loading' ? (
           <p className="py-10 text-center text-sm text-ink-2">Oturum kontrol ediliyor…</p>
@@ -118,6 +127,7 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
           <ManageScreen />
         )}
       </main>
+      </AnnouncementsContext.Provider>
 
       {!needsLogin && (
         <nav className="fixed inset-x-0 bottom-0 z-30">
