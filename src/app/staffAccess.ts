@@ -1,7 +1,7 @@
 import { FirebaseError } from 'firebase/app'
 
 // Kept identical in clubcrm and sportflow (src/app/staffAccess.ts): both apps
-// share one origin, one sign-in and one view-role choice.
+// share one origin and one sign-in.
 
 export type StaffRole = 'admin' | 'memur' | 'koc'
 
@@ -20,7 +20,7 @@ const isStaffRole = (value: unknown): value is StaffRole =>
   typeof value === 'string' && (RANK as readonly string[]).includes(value)
 
 export interface StaffAccess {
-  /** Every role the person may view as, highest first. */
+  /** Every role the person holds, highest first; roles[0] drives the UI. */
   roles: StaffRole[]
   groupIds: string[]
   displayName: string | null
@@ -62,28 +62,5 @@ export async function resolveAccess(
     roles,
     groupIds: stringList(record.groupIds),
     displayName: typeof record.displayName === 'string' && record.displayName ? record.displayName : null,
-  }
-}
-
-/** The requested view role if the person owns it, otherwise their highest role. */
-export function pickViewRole(owned: readonly StaffRole[], requested: string | null): StaffRole | null {
-  return owned.find((role) => role === requested) ?? owned[0] ?? null
-}
-
-const VIEW_ROLE_KEY = 'anadoluspor.viewRole'
-
-export function readViewRole(): string | null {
-  try {
-    return localStorage.getItem(VIEW_ROLE_KEY)
-  } catch {
-    return null
-  }
-}
-
-export function storeViewRole(role: StaffRole): void {
-  try {
-    localStorage.setItem(VIEW_ROLE_KEY, role)
-  } catch {
-    // Storage blocked (private window): the choice lasts for this page only.
   }
 }
