@@ -32,6 +32,7 @@ import {
   chunks,
   diffMemberships,
   isOverdue,
+  openGroupIds,
   parseSessionId,
   primaryGuardianId,
   recordsOf,
@@ -114,10 +115,52 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
     return rows
   }
 
-  const membershipsOf = async (studentIds: string[]): Promise<MembershipDoc[]> =>
-    (await whereIn('memberships', 'studentId', studentIds)).map(
-      ({ id, data }) => ({ ...data, id }) as MembershipDoc,
-    )
+  /**
+   * Koç kapsamı: kural koça yalnız staff/{e-posta}.groupIds gruplarını ve bu
+   * gruplardaki öğrencileri okutur. Toplu sorgu reddedilince bu listeyle tek tek okunur.
+   */
+  let coachGroups: Promise<string[]> | null = null
+  const coachGroupIds = () => {
+    coachGroups ??= (async () => {
+      const email = options.currentUserEmail?.()?.toLowerCase()
+      if (!email) return []
+      const snapshot = await getDoc(doc(db, 'staff', email))
+      const ids: unknown = snapshot.exists() ? snapshot.data().groupIds : []
+      return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : []
+    })()
+    return coachGroups
+  }
+
+  const membershipsOf = async (studentIds: string[]): Promise<MembershipDoc[]> => {
+    const rows = await whereIn('memberships', 'studentId', studentIds).catch(async (error: unknown) => {
+      if (!isDenied(error)) throw error
+      // Koç: başka gruplardaki üyelikler görünmez; yalnız kendi gruplarınınki.
+      const groups = await Promise.all(
+        (await coachGroupIds()).map((groupId) =>
+          getDocs(query(collection(db, 'memberships'), where('groupId', '==', groupId))),
+        ),
+      )
+      const wanted = new Set(studentIds)
+      return groups
+        .flatMap((snapshot) => snapshot.docs.map((row) => ({ id: row.id, data: row.data() })))
+        .filter(({ data }) => wanted.has(data.studentId as string))
+    })
+    return rows.map(({ id, data }) => ({ ...data, id }) as MembershipDoc)
+  }
+
+  /** Koç toplu okuyamaz: öğrenciler tek tek; kapsam dışı (reddedilen) öğrenci atlanır. */
+  const studentsOf = (studentIds: string[]) =>
+    byIds('students', studentIds).catch(async (error: unknown) => {
+      if (!isDenied(error)) throw error
+      const results = await Promise.allSettled(
+        [...new Set(studentIds)].map((id) => getDoc(doc(db, 'students', id))),
+      )
+      return results.flatMap((result) =>
+        result.status === 'fulfilled' && result.value.exists()
+          ? [{ id: result.value.id, data: result.value.data() }]
+          : [],
+      )
+    })
 
   /** Veli adı/telefonu memur+ okur; izin yoksa (koç) veli bilgisi boş kalır. */
   const guardiansOf = async (studentIds: string[]): Promise<Map<string, Guardian>> => {
@@ -147,7 +190,7 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
   const loadPlayers = async (studentIds: string[]): Promise<Player[]> => {
     if (studentIds.length === 0) return []
     const [students, memberships, guardians] = await Promise.all([
-      byIds('students', studentIds),
+      studentsOf(studentIds),
       membershipsOf(studentIds),
       guardiansOf(studentIds),
     ])
@@ -259,8 +302,15 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
     groups: {
       // Yalnız antrenman grupları yoklamada; maç kadroları CRM'de kalır.
       async list(filter: GroupFilter = {}) {
-        const snapshot = await getDocs(query(collection(db, 'groups'), where('kind', '==', 'training')))
-        return snapshot.docs
+        const rows = await getDocs(query(collection(db, 'groups'), where('kind', '==', 'training'))).then(
+          (snapshot) => snapshot.docs,
+          async (error: unknown) => {
+            if (!isDenied(error)) throw error
+            const own = await Promise.all((await coachGroupIds()).map((id) => getDoc(doc(db, 'groups', id))))
+            return own.filter((row) => row.exists() && row.data().kind === 'training')
+          },
+        )
+        return rows
           .map((row) => toGroup(row.id, row.data() as GroupDoc))
           .filter(
             (group) =>
@@ -319,6 +369,7 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
           birthDate: input.birthDate,
           gender: toStudentGender(input.gender),
           status: input.groupHistory.some((spell) => !spell.leftOn) ? 'active' : 'inactive',
+          groupIds: openGroupIds(input.groupHistory),
         })
         for (const spell of input.groupHistory) {
           const membershipId = newId('membership')
@@ -351,6 +402,7 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
         if (patch.groupHistory) {
           // Durum üyelikten türetilir; çağıranın gönderdiği status'e güvenilmez.
           fields.status = patch.groupHistory.some((spell) => !spell.leftOn) ? 'active' : 'inactive'
+          fields.groupIds = openGroupIds(patch.groupHistory)
           const diff = diffMemberships(await membershipsOf([id]), patch.groupHistory, todayIso())
           for (const row of diff.close) {
             batch.update(doc(db, 'memberships', row.id), { leftOn: row.leftOn })

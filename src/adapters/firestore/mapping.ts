@@ -43,6 +43,14 @@ export interface StudentDoc {
   gender?: string
 }
 
+/**
+ * students.groupIds: açık üyeliği olan gruplar (denormalize). Kural koçun okumasını
+ * buna göre verir; üyelik yazan her işlem aynı batch'te günceller.
+ */
+export function openGroupIds(spells: readonly { groupId: string; leftOn?: string }[]): string[] {
+  return [...new Set(spells.filter((spell) => !spell.leftOn).map((spell) => spell.groupId))].sort()
+}
+
 export interface MembershipDoc {
   id: string
   studentId: string
