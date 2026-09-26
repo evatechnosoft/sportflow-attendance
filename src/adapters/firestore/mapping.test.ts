@@ -9,6 +9,7 @@ import {
   primaryGuardianId,
   recordsOf,
   sessionDocId,
+  studentAttendanceDays,
   toAttendanceStatus,
   toGroup,
   toPlayer,
@@ -246,5 +247,16 @@ describe('chunks', () => {
     const parts = chunks(Array.from({ length: 61 }, (_, index) => index))
     expect(parts.map((part) => part.length)).toEqual([30, 30, 1])
     expect(chunks([])).toEqual([])
+  })
+})
+
+describe('studentAttendanceDays', () => {
+  it('öğrenci başına o günün durumu', () => {
+    expect(
+      studentAttendanceDays(
+        { s1: { status: 'present' }, s2: { status: 'absent' } },
+        '2026-09-26',
+      ),
+    ).toEqual({ s1: { '2026-09-26': 'present' }, s2: { '2026-09-26': 'absent' } })
   })
 })

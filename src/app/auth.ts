@@ -56,7 +56,7 @@ function rememberedAccess(email: string): StaffAccess | null {
 }
 
 /** Popup first; on phones that block popups, fall back to a full-page redirect. */
-async function signInWithGoogle(auth: Auth): Promise<void> {
+export async function signInWithGoogle(auth: Auth): Promise<void> {
   const provider = new GoogleAuthProvider()
   try {
     await signInWithPopup(auth, provider)

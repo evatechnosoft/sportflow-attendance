@@ -220,3 +220,11 @@ export function chunks<T>(items: T[], size = 30): T[][] {
   for (let index = 0; index < items.length; index += size) out.push(items.slice(index, index + size))
   return out
 }
+
+/** studentAttendance.days girdisi: öğrenci → {tarih: durum}; merge ile günler birikir. */
+export function studentAttendanceDays(
+  records: Record<string, { status: string }>,
+  date: string,
+): Record<string, Record<string, string>> {
+  return Object.fromEntries(Object.entries(records).map(([studentId, record]) => [studentId, { [date]: record.status }]))
+}

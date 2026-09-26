@@ -37,6 +37,7 @@ import {
   primaryGuardianId,
   recordsOf,
   sessionDocId,
+  studentAttendanceDays,
   toGroup,
   toPlayer,
   toStudentGender,
@@ -538,7 +539,16 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
         const data = buildAttendanceDoc({ ...session, takenBy: takenBy(), marks, now })
         // Boş records merge'de var olan kayıtları ezer: işaret yoksa yazma.
         if (marks.length > 0) {
-          await commit(setDoc(doc(db, 'attendance', sessionId), data, { merge: true }))
+          // Veli oturumu okuyamaz (grubun tüm çocukları içinde): çocuk başına kopya aynı batch'te.
+          const batch = writeBatch(db).set(doc(db, 'attendance', sessionId), data, { merge: true })
+          for (const [studentId, days] of Object.entries(studentAttendanceDays(data.records, session.date))) {
+            batch.set(
+              doc(db, 'studentAttendance', `${studentId}_${session.groupId}`),
+              { studentId, groupId: session.groupId, days },
+              { merge: true },
+            )
+          }
+          await commit(batch.commit())
         }
         return Object.entries(data.records).map(
           ([playerId, record]): Attendance => ({ sessionId, playerId, ...record }),
