@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
+import { CoachAnnouncements } from '../../announcements/CoachAnnouncements'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDataSource } from '../../app/dataSource'
 import { useSelection } from '../../app/selection'
@@ -327,6 +328,8 @@ export function AttendanceScreen() {
           Bu grupta aktif oyuncu yok.
         </p>
       )}
+
+      <CoachAnnouncements groupId={groupId} />
 
       {/* 6. Sticky kaydet */}
       {dirty && (
