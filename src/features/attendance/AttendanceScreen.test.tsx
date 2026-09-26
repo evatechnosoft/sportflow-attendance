@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider, onlineManager } from '@tanstack/react-query'
+import { createQueryClient } from '../../app/queryClient'
 import { AttendanceScreen } from './AttendanceScreen'
 import { DataSourceProvider } from '../../app/dataSource'
 import { SelectionProvider } from '../../app/selection'
@@ -50,7 +51,7 @@ async function setup(schedule: ScheduleSlot[] = [], dues: DuesOptions = {}) {
   }
   if (dues.dues === false) await db.settings.update({ fields: { dues: false } })
 
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const client = createQueryClient()
   render(
     <QueryClientProvider client={client}>
       <DataSourceProvider value={db}>
@@ -93,7 +94,7 @@ describe('AttendanceScreen', () => {
     const { db } = await setup()
     await db.settings.update({ fields: { school: false } })
     cleanup()
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const client = createQueryClient()
     render(
       <QueryClientProvider client={client}>
         <DataSourceProvider value={db}>
@@ -130,6 +131,22 @@ describe('AttendanceScreen', () => {
       expect(rows).toHaveLength(2)
       expect(rows.find((row) => row.status === 'absent')).toBeTruthy()
     })
+  })
+
+  it('çevrimdışı: kaydet asılı kalmaz, yazma veri kaynağına gider', async () => {
+    onlineManager.setOnline(false)
+    try {
+      const user = userEvent.setup({ delay: null })
+      const { db, group } = await setup()
+      await screen.findByText('Can Erdoğan')
+      await mark(user, 'Can Erdoğan', 'Var')
+      await user.click(screen.getByRole('button', { name: /Kaydet/ }))
+      await screen.findByText('Kaydedildi')
+      const session = (await db.sessions.listByGroup(group.id))[0]
+      expect(await db.attendance.listBySession(session.id)).toHaveLength(1)
+    } finally {
+      onlineManager.setOnline(true)
+    }
   })
 
   it('işaret yokken "henüz işaretlenmedi" gösterir, kaydet çubuğu görünmez', async () => {

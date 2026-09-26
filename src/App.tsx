@@ -5,8 +5,8 @@ import { HistoryScreen } from './features/attendance/HistoryScreen'
 import { ManageScreen } from './features/manage/ManageScreen'
 import { StudentsScreen } from './features/students/StudentsScreen'
 import { AccessDenied, LoginScreen } from './features/auth/LoginScreen'
-import { staffReader, useStaffAuth, useViewRole } from './app/auth'
-import { STAFF_ROLE_LABEL, type StaffRole } from './app/staffAccess'
+import { staffReader, useStaffAuth } from './app/auth'
+import { STAFF_ROLE_LABEL } from './app/staffAccess'
 import type { DataSourceHandle } from './app/createDataSource'
 import { initFirebase, readFirebaseEnv } from './adapters/firestore/firebase'
 import { useDataSource } from './app/dataSource'
@@ -26,7 +26,6 @@ const firebase = firebaseConfig ? initFirebase(firebaseConfig) : null
 const readStaff = firebase ? staffReader(firebase.db) : null
 /** Google sign-in with local data (until B3); a Firestore data source always needs it. */
 const AUTH_ON = import.meta.env.VITE_AUTH === 'google'
-const NO_ROLES: StaffRole[] = []
 
 export default function App({ handle }: { handle: DataSourceHandle }) {
   const [tab, setTab] = useState<TabId>('attendance')
@@ -37,7 +36,7 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
     handle.requiresAuth || AUTH_ON ? (firebase?.auth ?? null) : null,
     readStaff,
   )
-  const [viewRole, setViewRole] = useViewRole(state.status === 'ready' ? state.access.roles : NO_ROLES)
+  const viewRole = state.status === 'ready' ? state.access.roles[0] ?? null : null
 
   const needsLogin = state.status !== 'off' && state.status !== 'ready'
   // Coaches only take attendance; the CRM link is for admin/memur views.
@@ -86,21 +85,9 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
         </div>
         {state.status === 'ready' && viewRole && (
           <div className="mt-1 flex min-w-0 items-center gap-2 text-xs text-on-header-2">
-            <span className="min-w-0 flex-1 truncate">{state.displayName}</span>
-            {state.access.roles.length > 1 && (
-              <select
-                aria-label="Görünüm"
-                value={viewRole}
-                onChange={(event) => setViewRole(event.target.value)}
-                className="min-h-9 rounded-lg border border-on-header-2 bg-header px-2 text-xs font-semibold text-on-header"
-              >
-                {state.access.roles.map((role) => (
-                  <option key={role} value={role}>
-                    {STAFF_ROLE_LABEL[role]}
-                  </option>
-                ))}
-              </select>
-            )}
+            <span className="min-w-0 flex-1 truncate">
+              {state.displayName} · {STAFF_ROLE_LABEL[viewRole]}
+            </span>
             <button
               type="button"
               onClick={() => void signOutUser()}

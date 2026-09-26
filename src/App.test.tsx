@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { createQueryClient } from './app/queryClient'
 import App from './App'
 import type { StaffAuthState } from './app/auth'
 import type { StaffRole } from './app/staffAccess'
@@ -31,7 +32,7 @@ function renderApp(state: StaffAuthState) {
   auth.state = state
   const handle = createDataSource({} as ImportMetaEnv)
   render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={createQueryClient()}>
       <DataSourceProvider value={handle.dataSource}>
         <SelectionProvider>
           <App handle={handle} />
@@ -71,11 +72,10 @@ describe('App giriş ve roller', () => {
     expect(auth.signOutUser).toHaveBeenCalled()
   })
 
-  it('koç Yönetim bağlantısını görmez, tek rol olduğu için seçici de yok', () => {
+  it('koç Yönetim bağlantısını görmez', () => {
     renderApp(ready(['koc']))
-    expect(screen.getByText('Elif Kaya')).toBeDefined()
+    expect(screen.getByText('Elif Kaya · Koç')).toBeDefined()
     expect(screen.queryByRole('link', { name: 'Yönetim' })).toBeNull()
-    expect(screen.queryByLabelText('Görünüm')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Tanımlar' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Sporcular' })).toBeDefined()
   })
@@ -87,26 +87,12 @@ describe('App giriş ve roller', () => {
     expect(screen.queryByRole('button', { name: /Sporcu ekle/ })).toBeNull()
   })
 
-  it('Tanımlar açıkken koç görünümüne geçilirse sekme gizlenir, Yoklama açılır', async () => {
+  it('admin en yüksek rolüyle açılır: Yönetim + Tanımlar, seçici yok; eski saklı görünüm yok sayılır', () => {
+    stored.set('anadoluspor.viewRole', 'koc')
     renderApp(ready(['admin', 'memur', 'koc']))
-    await userEvent.click(screen.getByRole('button', { name: 'Tanımlar' }))
-    expect(screen.getByRole('button', { name: 'Tanımlar' }).getAttribute('aria-current')).toBe('page')
-    await userEvent.selectOptions(screen.getByLabelText('Görünüm'), 'koc')
-    expect(screen.queryByRole('button', { name: 'Tanımlar' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Yoklama' }).getAttribute('aria-current')).toBe('page')
-  })
-
-  it('admin Yönetim bağlantısını görür; koç görünümüne geçince gizlenir', async () => {
-    renderApp(ready(['admin', 'memur', 'koc']))
+    expect(screen.getByText('Elif Kaya · Admin')).toBeDefined()
     expect(screen.getByRole('link', { name: 'Yönetim' }).getAttribute('href')).toBe('/yonetim/')
-    await userEvent.selectOptions(screen.getByLabelText('Görünüm'), 'koc')
-    expect(screen.queryByRole('link', { name: 'Yönetim' })).toBeNull()
-    expect(stored.get('anadoluspor.viewRole')).toBe('koc')
-  })
-
-  it('saklı görünüm sahip olunmayan rolse yok sayılır', () => {
-    stored.set('anadoluspor.viewRole', 'admin')
-    renderApp(ready(['memur', 'koc']))
-    expect((screen.getByLabelText('Görünüm') as HTMLSelectElement).value).toBe('memur')
+    expect(screen.getByRole('button', { name: 'Tanımlar' })).toBeDefined()
+    expect(screen.queryByLabelText('Görünüm')).toBeNull()
   })
 })

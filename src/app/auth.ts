@@ -10,14 +10,7 @@ import {
   type Auth,
 } from 'firebase/auth'
 import { doc, getDoc, type Firestore } from 'firebase/firestore'
-import {
-  pickViewRole,
-  readViewRole,
-  resolveAccess,
-  storeViewRole,
-  type StaffAccess,
-  type StaffRole,
-} from './staffAccess'
+import { resolveAccess, type StaffAccess } from './staffAccess'
 
 // Kept identical in clubcrm and sportflow (src/app/auth.ts).
 
@@ -38,6 +31,29 @@ export function staffReader(db: Firestore) {
 }
 
 const message = (cause: unknown, fallback: string) => (cause instanceof Error ? cause.message : fallback)
+
+// Last resolved access per e-mail: offline the staff doc may be missing from the
+// Firestore cache, and the field phone must still open. The role only shapes the
+// view; the rules decide every write.
+const accessKey = (email: string) => `anadoluspor.access.${email.toLowerCase()}`
+
+function rememberAccess(email: string, access: StaffAccess | null): void {
+  try {
+    if (access) localStorage.setItem(accessKey(email), JSON.stringify(access))
+    else localStorage.removeItem(accessKey(email))
+  } catch {
+    // Storage blocked (private window): no offline fallback.
+  }
+}
+
+function rememberedAccess(email: string): StaffAccess | null {
+  try {
+    const raw = localStorage.getItem(accessKey(email))
+    return raw ? (JSON.parse(raw) as StaffAccess) : null
+  } catch {
+    return null
+  }
+}
 
 /** Popup first; on phones that block popups, fall back to a full-page redirect. */
 async function signInWithGoogle(auth: Auth): Promise<void> {
@@ -74,6 +90,7 @@ export function useStaffAuth(auth: Auth | null, readStaff: ((emailLower: string)
       resolveAccess(email, readStaff).then(
         (access) => {
           if (run !== latest) return
+          rememberAccess(email, access)
           setState(
             access
               ? { status: 'ready', email: email.toLowerCase(), displayName: access.displayName ?? user.displayName ?? email, access }
@@ -81,7 +98,13 @@ export function useStaffAuth(auth: Auth | null, readStaff: ((emailLower: string)
           )
         },
         (cause: unknown) => {
-          if (run === latest) setState({ status: 'error', message: message(cause, 'Yetki okunamadı') })
+          if (run !== latest) return
+          const known = rememberedAccess(email)
+          setState(
+            known
+              ? { status: 'ready', email: email.toLowerCase(), displayName: known.displayName ?? user.displayName ?? email, access: known }
+              : { status: 'error', message: message(cause, 'Yetki okunamadı') },
+          )
         },
       )
     })
@@ -105,20 +128,4 @@ export function useStaffAuth(auth: Auth | null, readStaff: ((emailLower: string)
   }, [auth])
 
   return { state, signIn, signOutUser }
-}
-
-/** The remembered view role, never one the person does not own. */
-export function useViewRole(owned: readonly StaffRole[]) {
-  const [requested, setRequested] = useState<string | null>(readViewRole)
-  const viewRole = pickViewRole(owned, requested)
-  const setViewRole = useCallback(
-    (role: string) => {
-      const allowed = owned.find((candidate) => candidate === role)
-      if (!allowed) return
-      storeViewRole(allowed)
-      setRequested(allowed)
-    },
-    [owned],
-  )
-  return [viewRole, setViewRole] as const
 }

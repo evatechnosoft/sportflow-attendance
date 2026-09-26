@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { createQueryClient } from '../../app/queryClient'
 import { ManageScreen } from './ManageScreen'
 import { DataSourceProvider } from '../../app/dataSource'
 import { createMockDataSource } from '../../adapters/mock/mockDataSource'
@@ -21,7 +22,7 @@ async function setup(withGroup = false, schedule: ScheduleSlot[] = []) {
     })
   }
 
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const client = createQueryClient()
   render(
     <QueryClientProvider client={client}>
       <DataSourceProvider value={db}>

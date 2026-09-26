@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { FirebaseError } from 'firebase/app'
-import { ownedRoles, pickViewRole, resolveAccess } from './staffAccess'
+import { ownedRoles, resolveAccess } from './staffAccess'
 
 const records = (docs: Record<string, unknown>) => async (id: string) => docs[id] ?? null
 
@@ -38,15 +38,7 @@ describe('resolveAccess', () => {
   })
 })
 
-describe('pickViewRole', () => {
-  it('sahip olunmayan rol asla seçilmez: en yüksek role düşer', () => {
-    expect(pickViewRole(['memur', 'koc'], 'admin')).toBe('memur')
-    expect(pickViewRole(['koc'], 'memur')).toBe('koc')
-    expect(pickViewRole(['admin', 'memur', 'koc'], 'koc')).toBe('koc')
-    expect(pickViewRole(['admin', 'memur', 'koc'], null)).toBe('admin')
-    expect(pickViewRole([], 'admin')).toBeNull()
-  })
-
+describe('ownedRoles', () => {
   it('ownedRoles boş listede boş döner', () => {
     expect(ownedRoles([])).toEqual([])
   })
