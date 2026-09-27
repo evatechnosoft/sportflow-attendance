@@ -26,3 +26,19 @@ export function addSlot(slots: ScheduleSlot[], slot: ScheduleSlot): ScheduleSlot
 export function hasSlotOn(slots: ScheduleSlot[], weekday: number): boolean {
   return slots.some((slot) => slot.weekday === weekday)
 }
+
+const minutesOf = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5))
+
+/**
+ * Şu anki saate denk gelen slot: dersten 30 dk önce açılır, bitişten 60 dk sonra kapanır.
+ * ponytail: pencere sabit; kulüp farklı tolerans isterse grup ayarına taşınır.
+ */
+export function slotNow(slots: ScheduleSlot[], weekday: number, time: string): ScheduleSlot | null {
+  const now = minutesOf(time)
+  return (
+    slots.find((slot) => {
+      const start = minutesOf(slot.startTime)
+      return slot.weekday === weekday && now >= start - 30 && now <= start + slot.durationMinutes + 60
+    }) ?? null
+  )
+}
