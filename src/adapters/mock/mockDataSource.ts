@@ -1,5 +1,5 @@
 import { DomainError, duplicate, invalid, inUse, notFound } from '../../domain/errors'
-import { DEFAULT_CLUB_SETTINGS } from '../../domain/types'
+import { DEFAULT_CLUB_SETTINGS, isValidWindow } from '../../domain/types'
 import type {
   Attendance,
   AttendanceStatus,
@@ -31,6 +31,10 @@ export interface MockSeed {
 }
 
 const clone = <T>(rows: T[]): T[] => rows.map((row) => ({ ...row }))
+const copySettings = (value: ClubSettings): ClubSettings => ({
+  fields: { ...value.fields },
+  window: { ...value.window },
+})
 
 export const emptyCounts = (): Record<AttendanceStatus, number> => ({
   present: 0,
@@ -67,7 +71,7 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
     description: 'OKUL BAZLI YOKLAMA — ÖRNEK VERİ',
   }
 
-  let settings: ClubSettings = { fields: { ...DEFAULT_CLUB_SETTINGS.fields } }
+  let settings: ClubSettings = copySettings(DEFAULT_CLUB_SETTINGS)
 
   let counter = 0
   const nextId = (prefix: string) => `${prefix}-${++counter}`
@@ -218,11 +222,17 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
         return { ...clubIdentity }
       },
       async get() {
-        return { fields: { ...settings.fields } }
+        return copySettings(settings)
       },
       async update(patch) {
-        settings = { fields: { ...settings.fields, ...patch.fields } }
-        return { fields: { ...settings.fields } }
+        if (patch.window && !isValidWindow(patch.window)) {
+          throw invalid('Yoklama penceresi', 'dakika 0-600 arası tam sayı olmalı')
+        }
+        settings = {
+          fields: { ...settings.fields, ...patch.fields },
+          window: { ...settings.window, ...patch.window },
+        }
+        return copySettings(settings)
       },
     },
 
@@ -276,7 +286,7 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
             const rows = attendance.filter((row) => row.sessionId === session.id)
             const counts = emptyCounts()
             for (const row of rows) counts[row.status] += 1
-            return { sessionId: session.id, date: session.date, counts, total: rows.length }
+            return { sessionId: session.id, date: session.date, counts, total: rows.length, makeup: session.makeup }
           })
           .filter((summary) => summary.total > 0)
           .sort((a, b) => b.date.localeCompare(a.date))

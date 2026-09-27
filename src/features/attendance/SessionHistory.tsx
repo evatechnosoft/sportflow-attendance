@@ -71,7 +71,14 @@ export function SessionHistory({
                     </span>
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-semibold">{dayLabel(summary.date)}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="truncate font-semibold">{dayLabel(summary.date)}</span>
+                      {summary.makeup && (
+                        <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-bold text-accent">
+                          Telafi
+                        </span>
+                      )}
+                    </span>
                     <span className="mt-1 flex gap-2 text-xs font-semibold">
                       {parts.map((part) => (
                         <span key={part.key} className={part.text}>

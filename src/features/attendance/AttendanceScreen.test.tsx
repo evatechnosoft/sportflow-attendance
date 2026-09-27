@@ -8,7 +8,7 @@ import { DataSourceProvider } from '../../app/dataSource'
 import { SelectionProvider } from '../../app/selection'
 import { createMockDataSource } from '../../adapters/mock/mockDataSource'
 import type { DataSource } from '../../ports/repositories'
-import type { ScheduleSlot } from '../../domain/types'
+import type { AttendanceWindow, ScheduleSlot } from '../../domain/types'
 import { endTime, todayIso, weekdayOf, WEEKDAY_LABEL } from './date'
 
 /** Bugünün dışındaki bir ISO gün — takvimi olan ama bugün toplanmayan grup için. */
@@ -18,6 +18,17 @@ const otherWeekday = () => (weekdayOf(todayIso()) % 7) + 1
 interface DuesOptions {
   canOverdue?: boolean
   dues?: boolean
+  window?: AttendanceWindow
+}
+
+/** Aynı gün içinde şimdiden 3 saat uzak ders saati: pencere (-30 dk … bitiş +60 dk) dışında. */
+const farTime = () => timeFromNow(new Date().getHours() < 12 ? 180 : -180)
+
+/** Şimdiden `offset` dk sonrası, HH:MM. */
+const timeFromNow = (offset: number) => {
+  const now = new Date()
+  const minutes = (now.getHours() * 60 + now.getMinutes() + offset + 1440) % 1440
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
 }
 
 async function setup(schedule: ScheduleSlot[] = [], dues: DuesOptions = {}) {
@@ -50,6 +61,7 @@ async function setup(schedule: ScheduleSlot[] = [], dues: DuesOptions = {}) {
     return dues.canOverdue ? [can.id] : []
   }
   if (dues.dues === false) await db.settings.update({ fields: { dues: false } })
+  if (dues.window) await db.settings.update({ window: dues.window })
 
   const client = createQueryClient()
   render(
@@ -173,16 +185,53 @@ describe('AttendanceScreen', () => {
 
   it('bugün ders günü ama saat pencere dışındaysa uyarı çıkar, kaydetme engellenmez', async () => {
     const user = userEvent.setup({ delay: null })
-    const now = new Date()
-    // Şimdiden 3 saat sonra başlayan ders: pencere (-30 dk … bitiş +60 dk) dışında.
-    const start = (now.getHours() * 60 + now.getMinutes() + 180) % 1440
-    const startTime = `${String(Math.floor(start / 60)).padStart(2, '0')}:${String(start % 60).padStart(2, '0')}`
+    const startTime = farTime()
     await setup([{ weekday: weekdayOf(todayIso()), startTime, durationMinutes: 60 }])
 
     await screen.findByText(`Şu an ders saati değil — bugünkü ders ${startTime}–${endTime(startTime, 60)}`)
     await screen.findByText('Can Erdoğan')
     await mark(user, 'Can Erdoğan', 'Var')
     expect(screen.getByRole('button', { name: /Kaydet/ })).toBeTruthy()
+  })
+
+  it('pencere ayardan gelir: geniş pencerede 3 saat uzaktaki ders için uyarı çıkmaz', async () => {
+    const startTime = farTime()
+    await setup([{ weekday: weekdayOf(todayIso()), startTime, durationMinutes: 60 }], {
+      window: { beforeMinutes: 240, afterMinutes: 240 },
+    })
+
+    await screen.findByRole('button', { name: `Saat: ${startTime}` })
+    await screen.findByText('Can Erdoğan')
+    expect(screen.queryByText(/Şu an ders saati değil/)).toBeNull()
+  })
+
+  it('telafi saati etrafında pencere uyarısı çıkmaz', async () => {
+    const user = userEvent.setup({ delay: null })
+    const startTime = farTime()
+    const makeupTime = timeFromNow(0)
+    await setup([{ weekday: weekdayOf(todayIso()), startTime, durationMinutes: 60 }])
+
+    await screen.findByText(/Şu an ders saati değil/)
+    await user.click(await screen.findByRole('button', { name: `Saat: ${startTime}` }))
+    await user.clear(screen.getByLabelText('Oturum saati'))
+    await user.type(screen.getByLabelText('Oturum saati'), makeupTime)
+    await user.click(screen.getByRole('button', { name: 'Telafi olarak kaydet (yalnız bu gün)' }))
+
+    await screen.findByRole('button', { name: `Telafi · ${makeupTime}` })
+    expect(screen.queryByText(/Şu an ders saati değil/)).toBeNull()
+  })
+
+  it('telafi oturumunda antrenman-yok uyarısı çıkmaz', async () => {
+    const user = userEvent.setup({ delay: null })
+    await setup([{ weekday: otherWeekday(), startTime: '17:00', durationMinutes: 90 }])
+
+    await screen.findByText(/antrenmanı yok/)
+    await user.click(await screen.findByRole('button', { name: /^Saat:/ }))
+    await user.type(screen.getByLabelText('Oturum saati'), '19:00')
+    await user.click(screen.getByRole('button', { name: 'Telafi olarak kaydet (yalnız bu gün)' }))
+
+    await screen.findByRole('button', { name: 'Telafi · 19:00' })
+    expect(screen.queryByText(/antrenmanı yok/)).toBeNull()
   })
 
   it('takvimi tanımlı olmayan grupta uyarı çıkmaz', async () => {
@@ -192,7 +241,7 @@ describe('AttendanceScreen', () => {
     expect(screen.queryByText(/antrenmanı yok/)).toBeNull()
   })
 
-  it('saat yalnız bu oturum için değiştirilir, grubun takvimi durur', async () => {
+  it('telafi yalnız bu günün oturumuna saat + telafi işareti yazar, grubun takvimi durur', async () => {
     const user = userEvent.setup({ delay: null })
     const today = weekdayOf(todayIso())
     const { db, group } = await setup([{ weekday: today, startTime: '17:00', durationMinutes: 90 }])
@@ -201,10 +250,11 @@ describe('AttendanceScreen', () => {
     await user.click(screen.getByRole('button', { name: 'Saat: 17:00' }))
     await user.clear(screen.getByLabelText('Oturum saati'))
     await user.type(screen.getByLabelText('Oturum saati'), '18:30')
-    await user.click(screen.getByRole('button', { name: 'Yalnız bu oturum' }))
+    await user.click(screen.getByRole('button', { name: 'Telafi olarak kaydet (yalnız bu gün)' }))
 
-    await screen.findByRole('button', { name: 'Saat: 18:30' })
-    expect((await db.sessions.listByGroup(group.id))[0].startTime).toBe('18:30')
+    await screen.findByRole('button', { name: 'Telafi · 18:30' })
+    const [session] = await db.sessions.listByGroup(group.id)
+    expect(session).toMatchObject({ startTime: '18:30', makeup: true })
     expect((await db.groups.list())[0].schedule[0].startTime).toBe('17:00')
   })
 
@@ -222,7 +272,9 @@ describe('AttendanceScreen', () => {
     await waitFor(async () =>
       expect((await db.groups.list())[0].schedule[0].startTime).toBe('18:30'),
     )
-    expect((await db.sessions.listByGroup(group.id))[0].startTime).toBe('18:30')
+    const [session] = await db.sessions.listByGroup(group.id)
+    expect(session.startTime).toBe('18:30')
+    expect(session.makeup).not.toBe(true)
   })
 
   it('takvim dışı günde bundan sonra hep seçeneği çıkmaz', async () => {
@@ -231,7 +283,7 @@ describe('AttendanceScreen', () => {
 
     await screen.findByText('Can Erdoğan')
     await user.click(screen.getByRole('button', { name: /^Saat:/ }))
-    expect(screen.getByRole('button', { name: 'Yalnız bu oturum' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Telafi olarak kaydet (yalnız bu gün)' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Bundan sonra hep' })).toBeNull()
   })
 })

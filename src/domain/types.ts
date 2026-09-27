@@ -62,6 +62,8 @@ export interface Session {
   /** ISO date, YYYY-MM-DD */
   date: string
   startTime?: string
+  /** Telafi: saat yalnız bu gün için girildi, haftalık takvim değişmedi. */
+  makeup?: boolean
 }
 
 export interface Attendance {
@@ -81,15 +83,32 @@ export interface ClubIdentity {
 /** Kulübün açıp kapatabildiği alanlar; ileride genişler. */
 export type OptionalField = 'school' | 'dues'
 
-export interface ClubSettings {
-  fields: Record<OptionalField, boolean>
+/** Yoklama saat penceresi: dersten kaç dk önce açılır, bitişten kaç dk sonra kapanır. */
+export interface AttendanceWindow {
+  beforeMinutes: number
+  afterMinutes: number
 }
 
-export const DEFAULT_CLUB_SETTINGS: ClubSettings = { fields: { school: true, dues: true } }
+export interface ClubSettings {
+  fields: Record<OptionalField, boolean>
+  window: AttendanceWindow
+}
+
+export const DEFAULT_CLUB_SETTINGS: ClubSettings = {
+  fields: { school: true, dues: true },
+  window: { beforeMinutes: 30, afterMinutes: 60 },
+}
+
+/** Pencere dakikaları 0-600 arası tam sayı olmalı. */
+export const isValidWindow = (window: AttendanceWindow) =>
+  [window.beforeMinutes, window.afterMinutes].every(
+    (minutes) => Number.isInteger(minutes) && minutes >= 0 && minutes <= 600,
+  )
 
 export interface SessionSummary {
   sessionId: Id
   date: string
   counts: Record<AttendanceStatus, number>
   total: number
+  makeup?: boolean
 }

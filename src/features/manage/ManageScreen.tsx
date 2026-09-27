@@ -3,7 +3,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDataSource } from '../../app/dataSource'
 import { Sheet } from '../../app/Sheet'
 import { DomainError } from '../../domain/errors'
-import { DEFAULT_CLUB_SETTINGS, type Id, type OptionalField, type ScheduleSlot } from '../../domain/types'
+import {
+  DEFAULT_CLUB_SETTINGS,
+  type AttendanceWindow,
+  type Id,
+  type OptionalField,
+  type ScheduleSlot,
+} from '../../domain/types'
 import { WEEKDAY_LABEL } from '../attendance/date'
 import { joinParts } from '../attendance/useGroupOptions'
 import { addSlot, hasSlotOn, scheduleLabel } from './schedule'
@@ -34,7 +40,7 @@ export function ManageScreen() {
   const branches = useQuery({ queryKey: ['branches'], queryFn: () => db.branches.list() })
   const groups = useQuery({ queryKey: ['groups'], queryFn: () => db.groups.list() })
   const settings = useQuery({ queryKey: ['club-settings'], queryFn: () => db.settings.get() })
-  const fields = (settings.data ?? DEFAULT_CLUB_SETTINGS).fields
+  const { fields, window: lessonWindow } = settings.data ?? DEFAULT_CLUB_SETTINGS
   const showSchool = fields.school
 
   const refresh = () => {
@@ -58,6 +64,11 @@ export function ManageScreen() {
   const toggleField = useMutation({
     mutationFn: ({ field, value }: { field: OptionalField; value: boolean }) =>
       db.settings.update({ fields: { [field]: value } }),
+    onSuccess: refresh,
+    onError: fail,
+  })
+  const saveWindow = useMutation({
+    mutationFn: (value: AttendanceWindow) => db.settings.update({ window: value }),
     onSuccess: refresh,
     onError: fail,
   })
@@ -119,6 +130,16 @@ export function ManageScreen() {
             onChange={(value) => toggleField.mutate({ field: 'dues', value })}
           />
         </div>
+      </Card>
+
+      <Card title="Yoklama saati">
+        {/* key: ayar yüklenince form yeni değerle baştan kurulur. */}
+        <WindowForm
+          key={`${lessonWindow.beforeMinutes}-${lessonWindow.afterMinutes}`}
+          value={lessonWindow}
+          busy={saveWindow.isPending}
+          onSubmit={(value) => saveWindow.mutate(value)}
+        />
       </Card>
 
       {showSchool && (
@@ -249,6 +270,51 @@ function FieldSwitch({
         />
       </span>
     </button>
+  )
+}
+
+/** Dersten önce / bitişten sonra dakika; doğrulama adaptörde, hata üstte gösterilir. */
+function WindowForm({
+  value,
+  busy,
+  onSubmit,
+}: {
+  value: AttendanceWindow
+  busy: boolean
+  onSubmit: (value: AttendanceWindow) => void
+}) {
+  const [before, setBefore] = useState(String(value.beforeMinutes))
+  const [after, setAfter] = useState(String(value.afterMinutes))
+  // Boş alan 0 değil geçersiz sayılır.
+  const toMinutes = (text: string) => (text.trim() === '' ? Number.NaN : Number(text))
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    onSubmit({ beforeMinutes: toMinutes(before), afterMinutes: toMinutes(after) })
+  }
+  const input = 'min-h-11 w-full rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm'
+  return (
+    <form onSubmit={submit} noValidate className="grid gap-2 sm:grid-cols-3">
+      <p className="text-xs text-ink-2 sm:col-span-3">
+        Bu aralık dışında yoklama açılırsa koça uyarı çıkar; kaydetme engellenmez.
+      </p>
+      <label className="text-xs font-semibold text-ink-2">
+        Dersten önce (dk)
+        <input type="number" inputMode="numeric" min={0} max={600} step={1} value={before}
+          onChange={(event) => setBefore(event.target.value)} className={`mt-1 ${input}`} />
+      </label>
+      <label className="text-xs font-semibold text-ink-2">
+        Bitişten sonra (dk)
+        <input type="number" inputMode="numeric" min={0} max={600} step={1} value={after}
+          onChange={(event) => setAfter(event.target.value)} className={`mt-1 ${input}`} />
+      </label>
+      <button
+        type="submit"
+        disabled={busy}
+        className="min-h-11 self-end rounded-xl bg-brand px-4 py-2 text-sm font-medium text-bg transition hover:opacity-90 disabled:opacity-40"
+      >
+        Pencereyi kaydet
+      </button>
+    </form>
   )
 }
 

@@ -50,7 +50,7 @@ export interface SessionRepository {
   /** Aynı grup + tarih için ikinci oturum açmaz, var olanı döner. */
   ensure(groupId: Id, date: string, startTime?: string): Promise<Session>
   /** Salon sınav olunca saat kayar — yalnız o oturumu etkiler. */
-  update(id: Id, patch: { startTime?: string }): Promise<Session>
+  update(id: Id, patch: { startTime?: string; makeup?: boolean }): Promise<Session>
   listByGroup(groupId: Id): Promise<Session[]>
 }
 
@@ -73,7 +73,11 @@ export interface SettingsRepository {
   clubIdentity(): Promise<ClubIdentity>
   /** Alan anahtarları; kapalı alan gizlenir, verisi silinmez. */
   get(): Promise<ClubSettings>
-  update(patch: { fields?: Partial<ClubSettings['fields']> }): Promise<ClubSettings>
+  /** Geçersiz pencere `invalid` ile reddedilir. */
+  update(patch: {
+    fields?: Partial<ClubSettings['fields']>
+    window?: ClubSettings['window']
+  }): Promise<ClubSettings>
 }
 
 /**

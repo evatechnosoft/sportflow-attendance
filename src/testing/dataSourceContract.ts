@@ -318,6 +318,30 @@ export function runDataSourceContract(name: string, makeDataSource: () => DataSo
       })
     })
 
+    describe('yoklama penceresi ayarı', () => {
+      it('varsayılan dersten 30 dk önce, bitişten 60 dk sonra', async () => {
+        expect((await db.settings.get()).window).toEqual({ beforeMinutes: 30, afterMinutes: 60 })
+      })
+
+      it('pencere güncellenir ve kalıcıdır, alanlar durur', async () => {
+        const updated = await db.settings.update({ window: { beforeMinutes: 15, afterMinutes: 0 } })
+        expect(updated.window).toEqual({ beforeMinutes: 15, afterMinutes: 0 })
+        expect((await db.settings.get()).window).toEqual({ beforeMinutes: 15, afterMinutes: 0 })
+        expect((await db.settings.get()).fields.school).toBe(true)
+      })
+
+      it('negatif, 600 üstü ya da kesirli dakika kaydedilmez', async () => {
+        for (const window of [
+          { beforeMinutes: -5, afterMinutes: 60 },
+          { beforeMinutes: 30, afterMinutes: 601 },
+          { beforeMinutes: 7.5, afterMinutes: 60 },
+        ]) {
+          await expect(db.settings.update({ window })).rejects.toMatchObject({ code: 'invalid' })
+        }
+        expect((await db.settings.get()).window).toEqual({ beforeMinutes: 30, afterMinutes: 60 })
+      })
+    })
+
     describe('US-1 yoklama', () => {
       it('aynı grup + tarih için ikinci oturum açılmaz', async () => {
         const group = await seedGroup()
@@ -333,6 +357,17 @@ export function runDataSourceContract(name: string, makeDataSource: () => DataSo
         const updated = await db.sessions.update(session.id, { startTime: '18:30' })
         expect(updated.startTime).toBe('18:30')
         expect((await db.sessions.listByGroup(group.id))[0].startTime).toBe('18:30')
+      })
+
+      it('telafi işareti oturuma yazılır, listede ve geçmişte görünür', async () => {
+        const group = await seedGroup()
+        const player = await seedPlayer(group.id)
+        const session = await db.sessions.ensure(group.id, '2026-09-21', '17:00')
+        await db.sessions.update(session.id, { startTime: '19:00', makeup: true })
+        await db.attendance.mark(session.id, [{ playerId: player.id, status: 'present' }])
+        expect((await db.sessions.listByGroup(group.id))[0]).toMatchObject({ startTime: '19:00', makeup: true })
+        expect((await db.sessions.ensure(group.id, '2026-09-21', '17:00')).makeup).toBe(true)
+        expect((await db.attendance.historyByGroup(group.id))[0].makeup).toBe(true)
       })
 
       it('olmayan oturumun saati güncellenemez', async () => {
