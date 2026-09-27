@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useContext, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDataSource } from '../../app/dataSource'
 import { useSelection } from '../../app/selection'
 import { Sheet } from '../../app/Sheet'
 import { DomainError } from '../../domain/errors'
-import type { Id, Player } from '../../domain/types'
+import { DEFAULT_CLUB_SETTINGS, type Id, type Player } from '../../domain/types'
+import { EvaluationsContext } from '../../evaluations/context'
+import { PlayerEvaluations, TeamEvaluations } from '../../evaluations/EvaluationPanels'
 import { GroupSheet } from '../attendance/GroupSheet'
 import { joinParts, useGroupOptions } from '../attendance/useGroupOptions'
 import { todayIso } from '../attendance/date'
@@ -44,6 +46,17 @@ export function StudentsScreen({ readOnly = false }: { readOnly?: boolean }) {
   // Header trigger anchors the picker on desktop; row actions open it centered.
   const [groupAnchor, setGroupAnchor] = useState<HTMLElement | null>(null)
   const [pending, setPending] = useState<Pending | null>(null)
+  const [evaluateFor, setEvaluateFor] = useState<Id | null>(null)
+
+  // Değerlendirme: koç da yazar (kural grup koçuna izin verir); kaynak yoksa bölüm gizli.
+  const evaluations = useContext(EvaluationsContext)
+  const evaluationRows = useQuery({
+    queryKey: ['evaluations', groupId],
+    enabled: Boolean(evaluations && groupId),
+    queryFn: () => evaluations!.source.listByGroup(groupId),
+  })
+  const settings = useQuery({ queryKey: ['club-settings'], queryFn: () => db.settings.get() })
+  const skills = settings.data?.skills ?? DEFAULT_CLUB_SETTINGS.skills
 
   useEffect(() => {
     if (!groupId && groups.data?.length) setGroupId(groups.data[0].id)
@@ -170,6 +183,15 @@ export function StudentsScreen({ readOnly = false }: { readOnly?: boolean }) {
 
       {adding && !readOnly && <AddForm onSubmit={(input) => add.mutate(input)} onInvalid={setError} />}
 
+      {evaluations && groupId && (
+        <TeamEvaluations
+          groupId={groupId}
+          studentIds={active.map((player) => player.id)}
+          rows={evaluationRows.data ?? []}
+          skills={skills}
+        />
+      )}
+
       <ul className="space-y-2">
         {active.map((player) => (
           <StudentRow
@@ -182,7 +204,21 @@ export function StudentsScreen({ readOnly = false }: { readOnly?: boolean }) {
             onMove={() => startPick(player, 'move')}
             onJoin={() => startPick(player, 'join')}
             onLeave={() => setPending({ kind: 'leave', player })}
-          />
+            evaluating={evaluateFor === player.id}
+            onEvaluate={
+              evaluations ? () => setEvaluateFor((prev) => (prev === player.id ? null : player.id)) : undefined
+            }
+          >
+            {evaluateFor === player.id && (
+              <PlayerEvaluations
+                name={fullName(player)}
+                studentId={player.id}
+                groupId={groupId}
+                rows={(evaluationRows.data ?? []).filter((row) => row.studentId === player.id)}
+                skills={skills}
+              />
+            )}
+          </StudentRow>
         ))}
       </ul>
 
@@ -265,8 +301,14 @@ function StudentRow({
   onLeave,
   overdue,
   readOnly,
+  evaluating,
+  onEvaluate,
+  children,
 }: {
   player: Player
+  evaluating: boolean
+  onEvaluate?: () => void
+  children?: ReactNode
   overdue: boolean
   readOnly: boolean
   open: boolean
@@ -305,6 +347,16 @@ function StudentRow({
             </span>
           )}
         </span>
+        {onEvaluate && (
+          <button
+            type="button"
+            aria-expanded={evaluating}
+            onClick={onEvaluate}
+            className="min-h-11 shrink-0 rounded-xl bg-accent-soft px-3 text-xs font-bold text-accent"
+          >
+            Değerlendir
+          </button>
+        )}
         {!readOnly && (
           <button
             type="button"
@@ -342,6 +394,7 @@ function StudentRow({
           </button>
         </div>
       )}
+      {children}
     </li>
   )
 }

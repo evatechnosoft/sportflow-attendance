@@ -10,6 +10,7 @@ import {
   type OptionalField,
   type ScheduleSlot,
 } from '../../domain/types'
+import { addSkill, type Skill } from '../../evaluations/evaluations'
 import { WEEKDAY_LABEL } from '../attendance/date'
 import { joinParts } from '../attendance/useGroupOptions'
 import { addSlot, hasSlotOn, scheduleLabel } from './schedule'
@@ -40,7 +41,7 @@ export function ManageScreen() {
   const branches = useQuery({ queryKey: ['branches'], queryFn: () => db.branches.list() })
   const groups = useQuery({ queryKey: ['groups'], queryFn: () => db.groups.list() })
   const settings = useQuery({ queryKey: ['club-settings'], queryFn: () => db.settings.get() })
-  const { fields, window: lessonWindow } = settings.data ?? DEFAULT_CLUB_SETTINGS
+  const { fields, window: lessonWindow, skills } = settings.data ?? DEFAULT_CLUB_SETTINGS
   const showSchool = fields.school
 
   const refresh = () => {
@@ -69,6 +70,11 @@ export function ManageScreen() {
   })
   const saveWindow = useMutation({
     mutationFn: (value: AttendanceWindow) => db.settings.update({ window: value }),
+    onSuccess: refresh,
+    onError: fail,
+  })
+  const saveSkills = useMutation({
+    mutationFn: (value: Skill[]) => db.settings.update({ skills: value }),
     onSuccess: refresh,
     onError: fail,
   })
@@ -139,6 +145,16 @@ export function ManageScreen() {
           value={lessonWindow}
           busy={saveWindow.isPending}
           onSubmit={(value) => saveWindow.mutate(value)}
+        />
+      </Card>
+
+      <Card title="Yetenekler" count={skills.length}>
+        {/* key: ayar yüklenince liste yeni değerle baştan kurulur. */}
+        <SkillsForm
+          key={skills.map((skill) => `${skill.key}:${skill.label}`).join('|')}
+          value={skills}
+          busy={saveSkills.isPending}
+          onSubmit={(value) => saveSkills.mutate(value)}
         />
       </Card>
 
@@ -315,6 +331,71 @@ function WindowForm({
         Pencereyi kaydet
       </button>
     </form>
+  )
+}
+
+/**
+ * Değerlendirmede puanlanan yetenekler. Ad değişince anahtar korunur; eski değerlendirmeler
+ * kendi yetenek listesini taşıdığı için ekleme/çıkarma onları bozmaz.
+ */
+function SkillsForm({
+  value,
+  busy,
+  onSubmit,
+}: {
+  value: Skill[]
+  busy: boolean
+  onSubmit: (value: Skill[]) => void
+}) {
+  const [rows, setRows] = useState(value)
+  const [name, setName] = useState('')
+  const input = 'min-h-11 w-full rounded-xl border border-line bg-surface-2 px-3 py-2 text-sm'
+  const add = (event: FormEvent) => {
+    event.preventDefault()
+    if (!name.trim()) return
+    setRows(addSkill(rows, name))
+    setName('')
+  }
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-ink-2">Koç sporcu ve takımı bu yeteneklerde 1-10 puanlar.</p>
+      <ul className="space-y-1.5">
+        {rows.map((skill, index) => (
+          <li key={skill.key} className="flex items-center gap-1.5">
+            <input
+              value={skill.label}
+              aria-label={`Yetenek ${index + 1}`}
+              onChange={(event) =>
+                setRows(rows.map((row) => (row.key === skill.key ? { ...row, label: event.target.value } : row)))
+              }
+              className={input}
+            />
+            <button
+              type="button"
+              aria-label={`Çıkar: ${skill.label}`}
+              onClick={() => setRows(rows.filter((row) => row.key !== skill.key))}
+              className="h-11 w-11 shrink-0 rounded-xl bg-absent-soft text-absent"
+            >
+              ✕
+            </button>
+          </li>
+        ))}
+      </ul>
+      <form onSubmit={add} className="flex gap-1.5">
+        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Yeni yetenek" aria-label="Yeni yetenek" className={input} />
+        <button type="submit" className="min-h-11 shrink-0 rounded-xl bg-surface-2 px-4 text-sm font-medium">
+          Yetenek ekle
+        </button>
+      </form>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => onSubmit(rows.map((row) => ({ ...row, label: row.label.trim() })))}
+        className="min-h-11 w-full rounded-xl bg-brand px-4 py-2 text-sm font-medium text-bg transition hover:opacity-90 disabled:opacity-40"
+      >
+        Yetenekleri kaydet
+      </button>
+    </div>
   )
 }
 

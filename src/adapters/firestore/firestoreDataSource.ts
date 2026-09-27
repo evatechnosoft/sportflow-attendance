@@ -28,6 +28,7 @@ import {
   type School,
 } from '../../domain/types'
 import type { DataSource, GroupFilter } from '../../ports/repositories'
+import { validateSkills } from '../../evaluations/evaluations'
 import {
   buildAttendanceDoc,
   chunks,
@@ -70,6 +71,7 @@ interface SportflowSettings {
   branches: Branch[]
   fields: ClubSettings['fields']
   window: ClubSettings['window']
+  skills: ClubSettings['skills']
 }
 
 const todayIso = () => new Date().toISOString().slice(0, 10)
@@ -228,6 +230,7 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
       branches: value?.branches ?? [],
       fields: { ...DEFAULT_CLUB_SETTINGS.fields, ...value?.fields },
       window: { ...DEFAULT_CLUB_SETTINGS.window, ...value?.window },
+      skills: value?.skills?.length ? value.skills : DEFAULT_CLUB_SETTINGS.skills,
     }
   }
 
@@ -480,19 +483,22 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
         return { ...CLUB_IDENTITY }
       },
       async get() {
-        const { fields, window } = await loadSettings()
-        return { fields, window }
+        const { fields, window, skills } = await loadSettings()
+        return { fields, window, skills }
       },
       async update(patch) {
         requireWrites()
         if (patch.window && !isValidWindow(patch.window)) {
           throw invalid('Yoklama penceresi', 'dakika 0-600 arası tam sayı olmalı')
         }
+        const skillsError = patch.skills && validateSkills(patch.skills)
+        if (skillsError) throw invalid('Yetenek listesi', skillsError)
         const settings = await loadSettings()
         const fields = { ...settings.fields, ...patch.fields }
         const window = { ...settings.window, ...patch.window }
-        await saveSettings({ ...settings, fields, window })
-        return { fields, window }
+        const skills = patch.skills ?? settings.skills
+        await saveSettings({ ...settings, fields, window, skills })
+        return { fields, window, skills }
       },
     },
 

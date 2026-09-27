@@ -1,3 +1,5 @@
+import { DEFAULT_SKILLS, type Skill } from '../evaluations/evaluations'
+
 export type Id = string
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused'
@@ -92,11 +94,14 @@ export interface AttendanceWindow {
 export interface ClubSettings {
   fields: Record<OptionalField, boolean>
   window: AttendanceWindow
+  /** Değerlendirmede puanlanan yetenekler; Tanımlar'dan düzenlenir. */
+  skills: Skill[]
 }
 
 export const DEFAULT_CLUB_SETTINGS: ClubSettings = {
   fields: { school: true, dues: true },
   window: { beforeMinutes: 30, afterMinutes: 60 },
+  skills: DEFAULT_SKILLS,
 }
 
 /** Pencere dakikaları 0-600 arası tam sayı olmalı. */

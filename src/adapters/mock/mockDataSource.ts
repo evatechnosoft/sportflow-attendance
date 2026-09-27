@@ -1,5 +1,6 @@
 import { DomainError, duplicate, invalid, inUse, notFound } from '../../domain/errors'
 import { DEFAULT_CLUB_SETTINGS, isValidWindow } from '../../domain/types'
+import { validateSkills } from '../../evaluations/evaluations'
 import type {
   Attendance,
   AttendanceStatus,
@@ -34,6 +35,7 @@ const clone = <T>(rows: T[]): T[] => rows.map((row) => ({ ...row }))
 const copySettings = (value: ClubSettings): ClubSettings => ({
   fields: { ...value.fields },
   window: { ...value.window },
+  skills: value.skills.map((skill) => ({ ...skill })),
 })
 
 export const emptyCounts = (): Record<AttendanceStatus, number> => ({
@@ -228,9 +230,12 @@ export function createMockDataSource(seed: MockSeed = {}): DataSource {
         if (patch.window && !isValidWindow(patch.window)) {
           throw invalid('Yoklama penceresi', 'dakika 0-600 arası tam sayı olmalı')
         }
+        const skillsError = patch.skills && validateSkills(patch.skills)
+        if (skillsError) throw invalid('Yetenek listesi', skillsError)
         settings = {
           fields: { ...settings.fields, ...patch.fields },
           window: { ...settings.window, ...patch.window },
+          skills: patch.skills ?? settings.skills,
         }
         return copySettings(settings)
       },

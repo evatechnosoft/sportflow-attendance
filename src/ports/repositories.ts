@@ -73,10 +73,11 @@ export interface SettingsRepository {
   clubIdentity(): Promise<ClubIdentity>
   /** Alan anahtarları; kapalı alan gizlenir, verisi silinmez. */
   get(): Promise<ClubSettings>
-  /** Geçersiz pencere `invalid` ile reddedilir. */
+  /** Geçersiz pencere ya da yetenek listesi `invalid` ile reddedilir. */
   update(patch: {
     fields?: Partial<ClubSettings['fields']>
     window?: ClubSettings['window']
+    skills?: ClubSettings['skills']
   }): Promise<ClubSettings>
 }
 
