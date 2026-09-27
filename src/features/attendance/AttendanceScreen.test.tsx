@@ -274,7 +274,7 @@ describe('AttendanceScreen', () => {
     )
     const [session] = await db.sessions.listByGroup(group.id)
     expect(session.startTime).toBe('18:30')
-    expect(session.makeup).toBeUndefined()
+    expect(session.makeup).not.toBe(true)
   })
 
   it('takvim dışı günde bundan sonra hep seçeneği çıkmaz', async () => {

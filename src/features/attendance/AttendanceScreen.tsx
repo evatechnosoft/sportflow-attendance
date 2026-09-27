@@ -106,7 +106,7 @@ export function AttendanceScreen() {
   const setTime = useMutation({
     mutationFn: async ({ startTime, forever }: { startTime: string; forever: boolean }) => {
       // Telafi: yalnız bu günün oturumu, takvim değişmez.
-      await db.sessions.update(session.data!.id, forever ? { startTime } : { startTime, makeup: true })
+      await db.sessions.update(session.data!.id, forever ? { startTime, makeup: false } : { startTime, makeup: true })
       if (forever && slotOfDay) {
         const schedule: ScheduleSlot[] = selected!.schedule.map((slot) =>
           slot === slotOfDay ? { ...slot, startTime } : slot,
