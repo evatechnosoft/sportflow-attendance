@@ -13,10 +13,11 @@ import {
   type DocumentData,
   type Firestore,
 } from 'firebase/firestore'
-import { DomainError, duplicate, inUse, notFound } from '../../domain/errors'
+import { DomainError, duplicate, invalid, inUse, notFound } from '../../domain/errors'
 import { emptyCounts, requireValidSchedule } from '../mock/mockDataSource'
 import {
   DEFAULT_CLUB_SETTINGS,
+  isValidWindow,
   type Attendance,
   type Branch,
   type ClubIdentity,
@@ -68,6 +69,7 @@ interface SportflowSettings {
   schools: School[]
   branches: Branch[]
   fields: ClubSettings['fields']
+  window: ClubSettings['window']
 }
 
 const todayIso = () => new Date().toISOString().slice(0, 10)
@@ -225,6 +227,7 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
       schools: value?.schools ?? [],
       branches: value?.branches ?? [],
       fields: { ...DEFAULT_CLUB_SETTINGS.fields, ...value?.fields },
+      window: { ...DEFAULT_CLUB_SETTINGS.window, ...value?.window },
     }
   }
 
@@ -427,8 +430,17 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
 
     sessions: {
       // Oturum ayrı belge değil: kimlik groupId + tarihten; belge ilk yoklamada doğar.
+      // Kayıtlı saat/telafi takvim saatini ezer; belge okunamazsa (çevrimdışı, kural) takvim saati.
       async ensure(groupId, date, startTime) {
-        return { id: sessionDocId(groupId, date), groupId, date, startTime }
+        const id = sessionDocId(groupId, date)
+        const stored = await getDoc(doc(db, 'attendance', id)).then((row) => row.data(), () => undefined)
+        return {
+          id,
+          groupId,
+          date,
+          startTime: (stored?.startTime as string | undefined) || startTime,
+          ...(stored?.makeup === true && { makeup: true }),
+        }
       },
       async update(id, patch) {
         requireWrites()
@@ -438,6 +450,7 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
         const data: DocumentData = {
           ...session,
           startTime: patch.startTime,
+          ...(patch.makeup !== undefined && { makeup: patch.makeup }),
           takenBy: takenBy(),
           updatedAt: new Date().toISOString(),
         }
@@ -448,7 +461,7 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
         const exists = await getDoc(ref).then((row) => row.exists(), () => true)
         if (!exists) data.records = {}
         await commit(setDoc(ref, data, { merge: true }))
-        return { id, ...session, startTime: patch.startTime }
+        return { id, ...session, startTime: patch.startTime, ...(patch.makeup && { makeup: true }) }
       },
       async listByGroup(groupId) {
         const snapshot = await getDocs(query(collection(db, 'attendance'), where('groupId', '==', groupId)))
@@ -457,6 +470,7 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
           groupId,
           date: (row.data().date as string) ?? parseSessionId(row.id)?.date ?? '',
           startTime: (row.data().startTime as string | undefined) || undefined,
+          ...(row.data().makeup === true && { makeup: true }),
         }))
       },
     },
@@ -466,14 +480,19 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
         return { ...CLUB_IDENTITY }
       },
       async get() {
-        return { fields: (await loadSettings()).fields }
+        const { fields, window } = await loadSettings()
+        return { fields, window }
       },
       async update(patch) {
         requireWrites()
+        if (patch.window && !isValidWindow(patch.window)) {
+          throw invalid('Yoklama penceresi', 'dakika 0-600 arası tam sayı olmalı')
+        }
         const settings = await loadSettings()
         const fields = { ...settings.fields, ...patch.fields }
-        await saveSettings({ ...settings, fields })
-        return { fields }
+        const window = { ...settings.window, ...patch.window }
+        await saveSettings({ ...settings, fields, window })
+        return { fields, window }
       },
     },
 
@@ -523,6 +542,7 @@ export function createFirestoreDataSource(db: Firestore, options: FirestoreOptio
               date: (row.data().date as string) ?? parseSessionId(row.id)?.date ?? '',
               counts,
               total: records.length,
+              ...(row.data().makeup === true && { makeup: true }),
             }
           })
           .filter((summary) => summary.total > 0)

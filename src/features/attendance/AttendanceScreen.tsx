@@ -9,9 +9,9 @@ import { AttendanceRow } from './AttendanceRow'
 import { useOverdue } from './useOverdue'
 import { GroupSheet } from './GroupSheet'
 import { dayLabel, endTime, nowTime, shiftDay, shortDate, todayIso, weekdayOf, WEEKDAY_LABEL } from './date'
-import { hasSlotOn, slotNow } from '../manage/schedule'
+import { hasSlotOn, inWindow, slotNow } from '../manage/schedule'
 import { Sheet } from '../../app/Sheet'
-import type { ScheduleSlot } from '../../domain/types'
+import { DEFAULT_CLUB_SETTINGS, type ScheduleSlot } from '../../domain/types'
 import { isDirty, marksFromRows, STATUSES, STATUS_LABEL, summarize, type Marks } from './summary'
 
 const SEGMENT: Record<AttendanceStatus, string> = {
@@ -67,6 +67,12 @@ export function AttendanceScreen() {
     queryFn: () => db.sessions.ensure(groupId, date, slotOfDay?.startTime),
   })
 
+  // Koç ayarları okuyamazsa varsayılan pencere (useOverdue ile aynı önbellek).
+  const settings = useQuery({
+    queryKey: ['club-settings'],
+    queryFn: () => db.settings.get().catch(() => DEFAULT_CLUB_SETTINGS),
+  })
+
   const players = useQuery({
     queryKey: ['players', groupId],
     enabled: Boolean(groupId),
@@ -99,7 +105,8 @@ export function AttendanceScreen() {
 
   const setTime = useMutation({
     mutationFn: async ({ startTime, forever }: { startTime: string; forever: boolean }) => {
-      await db.sessions.update(session.data!.id, { startTime })
+      // Telafi: yalnız bu günün oturumu, takvim değişmez.
+      await db.sessions.update(session.data!.id, forever ? { startTime } : { startTime, makeup: true })
       if (forever && slotOfDay) {
         const schedule: ScheduleSlot[] = selected!.schedule.map((slot) =>
           slot === slotOfDay ? { ...slot, startTime } : slot,
@@ -128,14 +135,22 @@ export function AttendanceScreen() {
 
   const selected = groups.data?.find((group) => group.id === groupId)
   const slotOfDay = selected?.schedule.find((slot) => slot.weekday === weekdayOf(date))
-  // Kural 4-5: takvimi tanımlı grupta, o güne slot yoksa uyar — kaydetmeyi engelleme.
+  const makeup = session.data?.makeup === true
+  // Kural 4-5: takvimi tanımlı grupta, o güne slot yoksa uyar — telafi oturumu hariç, kaydetmeyi engelleme.
   const offDay =
-    selected && selected.schedule.length > 0 && !hasSlotOn(selected.schedule, weekdayOf(date))
-  // Bugün ders günü ama şu an ders penceresi dışında: uyar, kaydetmeyi engelleme.
+    !makeup && selected && selected.schedule.length > 0 && !hasSlotOn(selected.schedule, weekdayOf(date))
+  // Pencere oturumun kendi saatine göre; süre o günün slotundan, slot yoksa 60 dk.
+  const lessonWindow = settings.data?.window ?? DEFAULT_CLUB_SETTINGS.window
+  const lesson = session.data?.startTime
+    ? { startTime: session.data.startTime, durationMinutes: slotOfDay?.durationMinutes ?? 60 }
+    : slotOfDay
+  const inLesson =
+    lesson &&
+    (inWindow(lesson, nowTime(), lessonWindow) ||
+      (!makeup && slotNow(selected?.schedule ?? [], weekdayOf(date), nowTime(), lessonWindow) !== null))
+  // Bugün ders var ama şu an pencere dışında: uyar, kaydetmeyi engelleme.
   const offHour =
-    !offDay && slotOfDay && date === todayIso() && !slotNow(selected!.schedule, weekdayOf(date), nowTime())
-      ? slotOfDay
-      : null
+    !offDay && lesson && (slotOfDay || makeup) && date === todayIso() && !inLesson ? lesson : null
   const savedMarks = useMemo(() => marksFromRows(saved.data ?? []), [saved.data])
   const alreadySaved = (saved.data?.length ?? 0) > 0
   const dirty = isDirty(marks, savedMarks)
@@ -240,7 +255,7 @@ export function AttendanceScreen() {
             aria-expanded={timeAnchor !== null}
             className="min-h-11 shrink-0 rounded-2xl bg-surface-2 px-3 text-xs font-semibold text-ink-2"
           >
-            {`Saat: ${session.data.startTime ?? '—'}`}
+            {makeup ? `Telafi · ${session.data.startTime}` : `Saat: ${session.data.startTime ?? '—'}`}
           </button>
         )}
         {alreadySaved && (
@@ -398,7 +413,7 @@ export function AttendanceScreen() {
   )
 }
 
-/** Oturum saati: yalnız bu oturum, ya da grubun o günkü slotu da. */
+/** Oturum saati: telafi (yalnız bu gün), ya da grubun o günkü slotu da. */
 function TimeSheet({
   open,
   startTime,
@@ -439,7 +454,7 @@ function TimeSheet({
           onClick={() => onSubmit(value, false)}
           className="min-h-[52px] w-full rounded-2xl bg-brand font-medium text-bg disabled:opacity-40"
         >
-          Yalnız bu oturum
+          Telafi olarak kaydet (yalnız bu gün)
         </button>
         {canRepeat && (
           <button

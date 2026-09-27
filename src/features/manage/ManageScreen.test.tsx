@@ -168,3 +168,38 @@ describe('ManageScreen — A6 aidat anahtarı', () => {
     expect((await db.settings.get()).fields.school).toBe(true)
   })
 })
+
+describe('ManageScreen — yoklama penceresi', () => {
+  afterEach(cleanup)
+
+  it('pencere varsayılanla gelir, düzenlenip kaydedilir', async () => {
+    const user = userEvent.setup({ delay: null })
+    const { db } = await setup()
+
+    const before = await screen.findByLabelText('Dersten önce (dk)')
+    await waitFor(() => expect((before as HTMLInputElement).value).toBe('30'))
+    expect((screen.getByLabelText('Bitişten sonra (dk)') as HTMLInputElement).value).toBe('60')
+
+    await user.clear(before)
+    await user.type(before, '45')
+    await user.click(screen.getByRole('button', { name: 'Pencereyi kaydet' }))
+
+    await waitFor(async () =>
+      expect((await db.settings.get()).window).toEqual({ beforeMinutes: 45, afterMinutes: 60 }),
+    )
+  })
+
+  it('geçersiz değer kaydedilmez, hata gösterilir', async () => {
+    const user = userEvent.setup({ delay: null })
+    const { db } = await setup()
+
+    const after = await screen.findByLabelText('Bitişten sonra (dk)')
+    await waitFor(() => expect((after as HTMLInputElement).value).toBe('60'))
+    await user.clear(after)
+    await user.type(after, '700')
+    await user.click(screen.getByRole('button', { name: 'Pencereyi kaydet' }))
+
+    await screen.findByText(/Yoklama penceresi geçersiz/)
+    expect((await db.settings.get()).window).toEqual({ beforeMinutes: 30, afterMinutes: 60 })
+  })
+})

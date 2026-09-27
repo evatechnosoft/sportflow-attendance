@@ -1,4 +1,4 @@
-import type { ScheduleSlot } from '../../domain/types'
+import type { AttendanceWindow, ScheduleSlot } from '../../domain/types'
 import { WEEKDAY_LABEL } from '../attendance/date'
 
 const isValidWeekday = (weekday: number) => Number.isInteger(weekday) && weekday >= 1 && weekday <= 7
@@ -29,16 +29,23 @@ export function hasSlotOn(slots: ScheduleSlot[], weekday: number): boolean {
 
 const minutesOf = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5))
 
-/**
- * Şu anki saate denk gelen slot: dersten 30 dk önce açılır, bitişten 60 dk sonra kapanır.
- * ponytail: pencere sabit; kulüp farklı tolerans isterse grup ayarına taşınır.
- */
-export function slotNow(slots: ScheduleSlot[], weekday: number, time: string): ScheduleSlot | null {
+/** Ders penceresi: başlangıçtan `beforeMinutes` önce açılır, bitişten `afterMinutes` sonra kapanır. */
+export function inWindow(
+  lesson: Pick<ScheduleSlot, 'startTime' | 'durationMinutes'>,
+  time: string,
+  window: AttendanceWindow,
+): boolean {
   const now = minutesOf(time)
-  return (
-    slots.find((slot) => {
-      const start = minutesOf(slot.startTime)
-      return slot.weekday === weekday && now >= start - 30 && now <= start + slot.durationMinutes + 60
-    }) ?? null
-  )
+  const start = minutesOf(lesson.startTime)
+  return now >= start - window.beforeMinutes && now <= start + lesson.durationMinutes + window.afterMinutes
+}
+
+/** Şu anki saate denk gelen slot; pencere kulüp ayarından gelir. */
+export function slotNow(
+  slots: ScheduleSlot[],
+  weekday: number,
+  time: string,
+  window: AttendanceWindow,
+): ScheduleSlot | null {
+  return slots.find((slot) => slot.weekday === weekday && inWindow(slot, time, window)) ?? null
 }
