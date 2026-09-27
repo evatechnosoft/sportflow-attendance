@@ -13,6 +13,9 @@ import { useDataSource } from './app/dataSource'
 import { THEME_LABEL, useTheme, type ThemeMode } from './app/theme'
 import { createFirestoreAnnouncements } from './announcements/announcements'
 import { AnnouncementsContext } from './announcements/CoachAnnouncements'
+import { createFirestoreEvaluations } from './evaluations/evaluations'
+import { EvaluationsContext } from './evaluations/context'
+import { createMemoryEvaluations } from './evaluations/memoryEvaluations'
 
 const TABS = [
   { id: 'attendance', label: 'Yoklama' },
@@ -45,6 +48,12 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [author?.email],
   )
+  // Demo veride bellekte; Firestore'da girişli kullanıcıyla.
+  const evaluations = useMemo(() => {
+    if (handle.kind === 'mock') return { source: createMemoryEvaluations(), me: 'demo@anadolu.spor' }
+    return firebase && author ? { source: createFirestoreEvaluations(firebase.db, () => author), me: author.email.toLowerCase() } : null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handle.kind, author?.email])
 
   const needsLogin = state.status !== 'off' && state.status !== 'ready'
   // Coaches only take attendance; the CRM link is for admin/memur views.
@@ -108,6 +117,7 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
       </header>
 
       <AnnouncementsContext.Provider value={announcements}>
+      <EvaluationsContext.Provider value={evaluations}>
       <main className="flex-1 px-4 py-4 pb-24">
         {state.status === 'loading' ? (
           <p className="py-10 text-center text-sm text-ink-2">Oturum kontrol ediliyor…</p>
@@ -127,6 +137,7 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
           <ManageScreen />
         )}
       </main>
+      </EvaluationsContext.Provider>
       </AnnouncementsContext.Provider>
 
       {!needsLogin && (

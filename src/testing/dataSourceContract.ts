@@ -342,6 +342,28 @@ export function runDataSourceContract(name: string, makeDataSource: () => DataSo
       })
     })
 
+    describe('yetenek listesi ayarı', () => {
+      it('varsayılan hazır voleybol listesi', async () => {
+        const { skills } = await db.settings.get()
+        expect(skills[0]).toEqual({ key: 'servis', label: 'Servis' })
+        expect(skills).toHaveLength(8)
+      })
+
+      it('liste güncellenir ve kalıcıdır, pencere durur', async () => {
+        const next = [{ key: 'servis', label: 'Servis atışı' }, { key: 'pas', label: 'Pas' }]
+        expect((await db.settings.update({ skills: next })).skills).toEqual(next)
+        expect((await db.settings.get()).skills).toEqual(next)
+        expect((await db.settings.get()).window).toEqual({ beforeMinutes: 30, afterMinutes: 60 })
+      })
+
+      it('boş liste ya da boş ad kaydedilmez', async () => {
+        for (const skills of [[], [{ key: 'a', label: ' ' }]]) {
+          await expect(db.settings.update({ skills })).rejects.toMatchObject({ code: 'invalid' })
+        }
+        expect((await db.settings.get()).skills).toHaveLength(8)
+      })
+    })
+
     describe('US-1 yoklama', () => {
       it('aynı grup + tarih için ikinci oturum açılmaz', async () => {
         const group = await seedGroup()

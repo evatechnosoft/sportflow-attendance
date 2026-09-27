@@ -203,3 +203,41 @@ describe('ManageScreen — yoklama penceresi', () => {
     expect((await db.settings.get()).window).toEqual({ beforeMinutes: 30, afterMinutes: 60 })
   })
 })
+
+describe('ManageScreen — yetenekler', () => {
+  afterEach(cleanup)
+
+  it('hazır liste gelir; yetenek eklenir, adı değişir, çıkarılır — anahtarlar korunur', async () => {
+    const user = userEvent.setup({ delay: null })
+    const { db } = await setup()
+
+    const servis = await screen.findByLabelText('Yetenek 1')
+    await waitFor(() => expect((servis as HTMLInputElement).value).toBe('Servis'))
+    await user.clear(servis)
+    await user.type(servis, 'Servis atışı')
+    await user.click(screen.getByRole('button', { name: 'Çıkar: Blok' }))
+    await user.type(screen.getByLabelText('Yeni yetenek'), 'Sıçrama')
+    await user.click(screen.getByRole('button', { name: 'Yetenek ekle' }))
+    await user.click(screen.getByRole('button', { name: 'Yetenekleri kaydet' }))
+
+    await waitFor(async () => {
+      const { skills } = await db.settings.get()
+      expect(skills[0]).toEqual({ key: 'servis', label: 'Servis atışı' })
+      expect(skills.some((skill) => skill.key === 'blok')).toBe(false)
+      expect(skills.at(-1)).toEqual({ key: 'sicrama', label: 'Sıçrama' })
+    })
+  })
+
+  it('boş adlı yetenek kaydedilmez, hata gösterilir', async () => {
+    const user = userEvent.setup({ delay: null })
+    const { db } = await setup()
+
+    const first = await screen.findByLabelText('Yetenek 1')
+    await waitFor(() => expect((first as HTMLInputElement).value).toBe('Servis'))
+    await user.clear(first)
+    await user.click(screen.getByRole('button', { name: 'Yetenekleri kaydet' }))
+
+    await screen.findByText(/Yetenek adı boş olamaz/)
+    expect((await db.settings.get()).skills[0].label).toBe('Servis')
+  })
+})
