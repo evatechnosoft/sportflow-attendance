@@ -9,7 +9,7 @@ import { SelectionProvider } from '../../app/selection'
 import { createMockDataSource } from '../../adapters/mock/mockDataSource'
 import type { DataSource } from '../../ports/repositories'
 import type { ScheduleSlot } from '../../domain/types'
-import { todayIso, weekdayOf, WEEKDAY_LABEL } from './date'
+import { endTime, todayIso, weekdayOf, WEEKDAY_LABEL } from './date'
 
 /** Bugünün dışındaki bir ISO gün — takvimi olan ama bugün toplanmayan grup için. */
 const otherWeekday = () => (weekdayOf(todayIso()) % 7) + 1
@@ -167,6 +167,20 @@ describe('AttendanceScreen', () => {
     // Takvim özeti başlıkta ve grup seçicide görünür.
     expect(screen.getAllByText(new RegExp(`${WEEKDAY_LABEL[day]} 17:00`)).length).toBeGreaterThan(0)
 
+    await mark(user, 'Can Erdoğan', 'Var')
+    expect(screen.getByRole('button', { name: /Kaydet/ })).toBeTruthy()
+  })
+
+  it('bugün ders günü ama saat pencere dışındaysa uyarı çıkar, kaydetme engellenmez', async () => {
+    const user = userEvent.setup({ delay: null })
+    const now = new Date()
+    // Şimdiden 3 saat sonra başlayan ders: pencere (-30 dk … bitiş +60 dk) dışında.
+    const start = (now.getHours() * 60 + now.getMinutes() + 180) % 1440
+    const startTime = `${String(Math.floor(start / 60)).padStart(2, '0')}:${String(start % 60).padStart(2, '0')}`
+    await setup([{ weekday: weekdayOf(todayIso()), startTime, durationMinutes: 60 }])
+
+    await screen.findByText(`Şu an ders saati değil — bugünkü ders ${startTime}–${endTime(startTime, 60)}`)
+    await screen.findByText('Can Erdoğan')
     await mark(user, 'Can Erdoğan', 'Var')
     expect(screen.getByRole('button', { name: /Kaydet/ })).toBeTruthy()
   })

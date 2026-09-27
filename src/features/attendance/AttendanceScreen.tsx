@@ -8,8 +8,8 @@ import { joinParts, useGroupOptions } from './useGroupOptions'
 import { AttendanceRow } from './AttendanceRow'
 import { useOverdue } from './useOverdue'
 import { GroupSheet } from './GroupSheet'
-import { dayLabel, shiftDay, shortDate, todayIso, weekdayOf, WEEKDAY_LABEL } from './date'
-import { hasSlotOn } from '../manage/schedule'
+import { dayLabel, endTime, nowTime, shiftDay, shortDate, todayIso, weekdayOf, WEEKDAY_LABEL } from './date'
+import { hasSlotOn, slotNow } from '../manage/schedule'
 import { Sheet } from '../../app/Sheet'
 import type { ScheduleSlot } from '../../domain/types'
 import { isDirty, marksFromRows, STATUSES, STATUS_LABEL, summarize, type Marks } from './summary'
@@ -131,6 +131,11 @@ export function AttendanceScreen() {
   // Kural 4-5: takvimi tanımlı grupta, o güne slot yoksa uyar — kaydetmeyi engelleme.
   const offDay =
     selected && selected.schedule.length > 0 && !hasSlotOn(selected.schedule, weekdayOf(date))
+  // Bugün ders günü ama şu an ders penceresi dışında: uyar, kaydetmeyi engelleme.
+  const offHour =
+    !offDay && slotOfDay && date === todayIso() && !slotNow(selected!.schedule, weekdayOf(date), nowTime())
+      ? slotOfDay
+      : null
   const savedMarks = useMemo(() => marksFromRows(saved.data ?? []), [saved.data])
   const alreadySaved = (saved.data?.length ?? 0) > 0
   const dirty = isDirty(marks, savedMarks)
@@ -294,6 +299,16 @@ export function AttendanceScreen() {
             <path d="M12 8v5M12 16h.01" />
           </svg>
           {`Bu grubun ${WEEKDAY_LABEL[weekdayOf(date)]} antrenmanı yok`}
+        </p>
+      )}
+      {offHour && (
+        <p className="mb-3 flex items-center gap-2 rounded-xl border-l-4 border-late bg-late-soft px-3 py-2 text-sm font-medium text-late">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-4 w-4 shrink-0">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 2" />
+          </svg>
+          {`Şu an ders saati değil — bugünkü ders ${offHour.startTime}–${endTime(offHour.startTime, offHour.durationMinutes)}`}
         </p>
       )}
 

@@ -39,3 +39,12 @@ export function dayLabel(iso: string, today: string = todayIso()): string {
 /** "21 Eyl" — başlık altı kısa tarih. */
 export const shortDate = (iso: string) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })
+
+/** Yerel saat "HH:MM". */
+export const nowTime = (now: Date = new Date()) => now.toTimeString().slice(0, 5)
+
+/** "12:00" + 60 dk → "13:00" (gün aşımı mod 24). */
+export function endTime(start: string, minutes: number): string {
+  const total = (Number(start.slice(0, 2)) * 60 + Number(start.slice(3, 5)) + minutes) % 1440
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
