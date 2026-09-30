@@ -45,7 +45,7 @@ export function CoachAnnouncements({ groupId }: { groupId: string }) {
   }
 
   return (
-    <section aria-label="Duyurular" className="mt-6 space-y-2 rounded-2xl border border-line bg-surface p-3">
+    <section id="duyurular" aria-label="Duyurular" className="mt-6 scroll-mt-4 space-y-2 rounded-2xl border border-line bg-surface p-3">
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-display text-sm font-bold uppercase tracking-wide text-ink-2">Duyurular</h2>
         <button type="button" onClick={() => setOpen(!open)} className="min-h-11 px-2 text-sm font-semibold text-accent">
