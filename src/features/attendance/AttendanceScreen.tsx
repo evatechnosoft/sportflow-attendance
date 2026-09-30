@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, useRef } from 'react'
-import { CoachAnnouncements } from '../../announcements/CoachAnnouncements'
+import { useContext, useEffect, useMemo, useState, useRef } from 'react'
+import { AnnouncementsContext, CoachAnnouncements } from '../../announcements/CoachAnnouncements'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useDataSource } from '../../app/dataSource'
 import { useSelection } from '../../app/selection'
@@ -46,6 +46,7 @@ interface Toast {
 
 export function AttendanceScreen() {
   const db = useDataSource()
+  const hasAnnouncements = useContext(AnnouncementsContext) !== null
   const queryClient = useQueryClient()
   const groups = useGroupOptions()
   const { groupId, date, setGroupId, setDate } = useSelection()
@@ -268,7 +269,18 @@ export function AttendanceScreen() {
       {/* 3. Yığılmış ilerleme + durum çipleri */}
       <div className="py-4">
         <div className="mb-2 flex items-baseline justify-between gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-ink-2">Yoklama</span>
+          <span className="flex items-baseline gap-3">
+            <span className="text-xs font-semibold uppercase tracking-wider text-ink-2">Yoklama</span>
+            {hasAnnouncements && groupId && (
+              <button
+                type="button"
+                onClick={() => document.getElementById('duyurular')?.scrollIntoView({ behavior: 'smooth' })}
+                className="min-h-11 text-sm font-semibold text-accent"
+              >
+                Duyurular ↓
+              </button>
+            )}
+          </span>
           <span className="font-display text-sm font-bold tabular-nums text-ink">
             {summary.marked}/{summary.total} işaretli
             {summary.rate !== null && ` · %${summary.rate} katılım`}
