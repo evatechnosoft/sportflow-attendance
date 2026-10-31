@@ -16,6 +16,7 @@ import { AnnouncementsContext } from './announcements/CoachAnnouncements'
 import { createFirestoreEvaluations } from './evaluations/evaluations'
 import { EvaluationsContext } from './evaluations/context'
 import { createMemoryEvaluations } from './evaluations/memoryEvaluations'
+import { isFeatureOn } from './app/remoteFlags'
 
 const TABS = [
   { id: 'attendance', label: 'Yoklama' },
@@ -44,12 +45,13 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
   const viewRole = state.status === 'ready' ? state.access.roles[0] ?? null : null
   const author = state.status === 'ready' ? { email: state.email, name: state.displayName } : null
   const announcements = useMemo(
-    () => (firebase && author ? createFirestoreAnnouncements(firebase.db, () => author) : null),
+    () => (isFeatureOn('announcements') && firebase && author ? createFirestoreAnnouncements(firebase.db, () => author) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [author?.email],
   )
   // Demo veride bellekte; Firestore'da girişli kullanıcıyla.
   const evaluations = useMemo(() => {
+    if (!isFeatureOn('evaluations')) return null
     if (handle.kind === 'mock') return { source: createMemoryEvaluations(), me: 'demo@anadolu.spor' }
     return firebase && author ? { source: createFirestoreEvaluations(firebase.db, () => author), me: author.email.toLowerCase() } : null
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -59,7 +61,9 @@ export default function App({ handle }: { handle: DataSourceHandle }) {
   // Coaches only take attendance; the CRM link is for admin/memur views.
   const showManage = state.status === 'off' || (state.status === 'ready' && viewRole !== 'koc')
   // Group/settings definitions are memur+; a coach view falls back to attendance.
-  const tabs = viewRole === 'koc' ? TABS.filter((item) => item.id !== 'manage') : TABS
+  const tabs = TABS.filter(
+    (item) => !(viewRole === 'koc' && item.id === 'manage') && !(item.id === 'history' && !isFeatureOn('history')),
+  )
   const currentTab: TabId = tabs.some((item) => item.id === tab) ? tab : 'attendance'
 
   return (

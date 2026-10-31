@@ -7,6 +7,12 @@ import App from './App'
 import { DataSourceProvider } from './app/dataSource'
 import { createDataSource } from './app/createDataSource'
 import { SelectionProvider } from './app/selection'
+import { initFirebase, readFirebaseEnv } from './adapters/firestore/firebase'
+import { loadRemoteFeatureFlags } from './app/remoteFlags'
+
+const firebaseConfig = readFirebaseEnv(import.meta.env)
+// Activates cached kill-switches before first render; never blocks on the network.
+if (firebaseConfig?.appId) await loadRemoteFeatureFlags(initFirebase(firebaseConfig).app)
 
 const handle = createDataSource(import.meta.env)
 const queryClient = createQueryClient()
